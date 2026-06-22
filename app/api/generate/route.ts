@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
 
-// Style → prompt prefix map to steer the model
-const STYLE_PREFIXES: Record<string, string> = {
-  realistic: "Photorealistic motion, natural lighting,",
-  cinematic: "Cinematic camera movement, film grain, dramatic lighting,",
-  cartoon: "Animated cartoon style, vibrant colors, smooth motion,",
-  product_ad: "Clean product advertisement, professional lighting, slow reveal,",
-  mascot: "Fun mascot animation, bouncy movement, character animation,",
+// Style → prompt suffix. Keep camera stable and preserve the source art style.
+const STYLE_SUFFIXES: Record<string, string> = {
+  realistic: "Keep the original art style. Static camera, no zoom, no pan.",
+  cinematic: "Slow cinematic push-in. Keep the original art style exactly as-is.",
+  cartoon: "Keep the original illustration and art style exactly as-is. Static camera, no zoom.",
+  product_ad: "Slow reveal. Keep the original art style exactly as-is. Static camera.",
+  mascot: "Keep the original character art style exactly as-is. Static camera, minimal movement.",
 };
 
 export async function POST(req: NextRequest) {
@@ -40,11 +40,9 @@ export async function POST(req: NextRequest) {
     const imageBlob = new Blob([imageBuffer], { type: imageFile.type });
     const imageUrl = await fal.storage.upload(imageBlob);
 
-    // Build the enriched prompt
-    const stylePrefix = STYLE_PREFIXES[style] || "";
-    const enrichedPrompt = stylePrefix
-      ? `${stylePrefix} ${prompt}`
-      : prompt;
+    // Build the enriched prompt — suffix keeps art style and camera stable
+    const styleSuffix = STYLE_SUFFIXES[style] || "Keep the original art style exactly as-is. Static camera.";
+    const enrichedPrompt = `${prompt}. ${styleSuffix}`;
 
     // Submit async job to Kling v2.1 image-to-video
     const { request_id } = await fal.queue.submit(
