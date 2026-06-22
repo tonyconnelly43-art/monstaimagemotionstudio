@@ -118,7 +118,7 @@ export default function StudioPage() {
           href="/"
           className="text-xl font-bold tracking-tight bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent"
         >
-          ← Monstai Motion Studio
+          ← Monsta Motion Studio
         </Link>
         <span className="text-white/40 text-sm">Image → Video</span>
       </nav>

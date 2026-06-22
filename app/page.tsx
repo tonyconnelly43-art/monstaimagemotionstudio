@@ -6,7 +6,7 @@ export default function Home() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 py-5 border-b border-white/10">
         <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-          Monstai Motion Studio
+          Monsta Motion Studio
         </span>
         <Link
           href="/studio"
@@ -74,7 +74,7 @@ export default function Home() {
       </section>
 
       <footer className="text-center py-6 text-white/30 text-sm border-t border-white/10">
-        Monstai Image Motion Studio — built with fal.ai
+        Monsta Motion Studio — built with fal.ai
       </footer>
     </main>
   );

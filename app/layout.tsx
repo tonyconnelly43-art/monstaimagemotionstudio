@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Monstai Image Motion Studio",
+  title: "Monsta Motion Studio",
   description: "Transform your images into stunning short videos with AI",
 };
 

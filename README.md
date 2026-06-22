@@ -1,4 +1,4 @@
-# Monstai Image Motion Studio
+# Monsta Motion Studio
 
 Transform static images into short AI-generated videos using [fal.ai](https://fal.ai) and the Kling v1.6 image-to-video model.
 
