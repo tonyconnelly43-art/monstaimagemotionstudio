@@ -22,13 +22,13 @@ export async function GET(req: NextRequest) {
     }
 
     const statusRes = await fal.queue.status(
-      "fal-ai/kling-video/v1.6/standard/image-to-video",
+      "fal-ai/minimax-video/image-to-video",
       { requestId, logs: false }
     );
 
     if (statusRes.status === "COMPLETED") {
       const result = await fal.queue.result(
-        "fal-ai/kling-video/v1.6/standard/image-to-video",
+        "fal-ai/minimax-video/image-to-video",
         { requestId }
       );
 

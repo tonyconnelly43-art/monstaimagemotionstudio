@@ -46,15 +46,14 @@ export async function POST(req: NextRequest) {
       ? `${stylePrefix} ${prompt}`
       : prompt;
 
-    // Submit async job to fal-ai/kling-video/v1.6/standard/image-to-video
-    // Kling supports duration 5s and 10s natively
+    // Submit async job to Hailuo (MiniMax) image-to-video
+    // Better character animation and prompt-following than Kling
     const { request_id } = await fal.queue.submit(
-      "fal-ai/kling-video/v1.6/standard/image-to-video",
+      "fal-ai/minimax-video/image-to-video",
       {
         input: {
           image_url: imageUrl,
           prompt: enrichedPrompt,
-          duration: duration === 10 ? "10" : "5",
         },
       }
     );
