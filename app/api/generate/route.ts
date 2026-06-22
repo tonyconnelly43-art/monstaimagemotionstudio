@@ -46,16 +46,14 @@ export async function POST(req: NextRequest) {
       ? `${stylePrefix} ${prompt}`
       : prompt;
 
-    // Submit async job to Luma Dream Machine image-to-video
-    // Best overall motion quality and smoothness
+    // Submit async job to Kling v2.1 image-to-video
     const { request_id } = await fal.queue.submit(
-      "fal-ai/luma-dream-machine/image-to-video",
+      "fal-ai/kling-video/v2.1/standard/image-to-video",
       {
         input: {
           image_url: imageUrl,
           prompt: enrichedPrompt,
-          duration: duration === 10 ? "9" : "5",
-          aspect_ratio: "16:9",
+          duration: duration === 10 ? "10" : "5",
         },
       }
     );

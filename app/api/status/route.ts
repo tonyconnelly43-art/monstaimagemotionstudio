@@ -22,13 +22,13 @@ export async function GET(req: NextRequest) {
     }
 
     const statusRes = await fal.queue.status(
-      "fal-ai/luma-dream-machine/image-to-video",
+      "fal-ai/kling-video/v2.1/standard/image-to-video",
       { requestId, logs: false }
     );
 
     if (statusRes.status === "COMPLETED") {
       const result = await fal.queue.result(
-        "fal-ai/luma-dream-machine/image-to-video",
+        "fal-ai/kling-video/v2.1/standard/image-to-video",
         { requestId }
       );
 
