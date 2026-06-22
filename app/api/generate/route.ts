@@ -46,14 +46,16 @@ export async function POST(req: NextRequest) {
       ? `${stylePrefix} ${prompt}`
       : prompt;
 
-    // Submit async job to Hailuo (MiniMax) image-to-video
-    // Better character animation and prompt-following than Kling
+    // Submit async job to Luma Dream Machine image-to-video
+    // Best overall motion quality and smoothness
     const { request_id } = await fal.queue.submit(
-      "fal-ai/minimax-video/image-to-video",
+      "fal-ai/luma-dream-machine/image-to-video",
       {
         input: {
           image_url: imageUrl,
           prompt: enrichedPrompt,
+          duration: duration === 10 ? "9" : "5",
+          aspect_ratio: "16:9",
         },
       }
     );
