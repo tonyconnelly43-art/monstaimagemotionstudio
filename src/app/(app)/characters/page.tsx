@@ -25,7 +25,7 @@ export default async function CharactersPage() {
               <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted/60">
                 {c.main_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.main_image_url} alt={c.name} className="size-full object-cover" />
+                  <img src={c.main_image_url} alt={c.name} className="size-full object-contain" />
                 ) : (
                   <Users className="size-8 text-muted-foreground/40" />
                 )}

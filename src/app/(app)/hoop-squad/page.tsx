@@ -26,7 +26,7 @@ export default async function HoopSquadPage() {
               <div className="flex aspect-video items-center justify-center overflow-hidden bg-muted/60">
                 {loc.main_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={loc.main_image_url} alt={loc.name} className="size-full object-cover" />
+                  <img src={loc.main_image_url} alt={loc.name} className="size-full object-contain" />
                 ) : (
                   <MapPinned className="size-8 text-muted-foreground/40" />
                 )}
