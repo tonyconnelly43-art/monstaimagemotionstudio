@@ -45,9 +45,16 @@ In the Supabase SQL editor, run the migrations in order:
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_seed.sql
 supabase/migrations/0003_storage.sql
+supabase/migrations/0004_grants.sql
 ```
 
 (Or, with the Supabase CLI linked to your project: `supabase db push`.)
+
+`0004_grants.sql` matters even if you leave "Automatically expose new tables" **off** when creating
+the project (the more secure default, and what this guide recommends) — that setting also controls
+whether Postgres grants the `authenticated` role base table access. Without it, every query fails
+with `permission denied for table ...` even though Row Level Security is configured correctly, since
+RLS policies control *which rows* a role can see, not whether it can query the table at all.
 
 This creates every table with Row Level Security, a trigger that gives each new signed-up user
 their 6 preconfigured Hoop Squad character placeholder slots (G, Zo, Zach, Dash, Fifth Player,
