@@ -44,7 +44,7 @@ export function ImageSlotUpload({
         <Loader2 className="size-5 animate-spin" />
       ) : url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={label} className="absolute inset-0 size-full object-cover" />
+        <img src={url} alt={label} className="absolute inset-0 size-full object-contain" />
       ) : (
         <>
           <ImagePlus className="mb-1 size-5" />
