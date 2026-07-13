@@ -49,6 +49,25 @@ export async function listSceneTakes(supabase: Client, sceneId: string) {
   return data ?? [];
 }
 
+/**
+ * Finds a still-in-flight job for this scene (queued/processing) so the
+ * Studio UI can resume watching it after a page reload or a fresh visit —
+ * otherwise a generation that outlives the browser tab that started it
+ * silently stops being checked and never gets finalized.
+ */
+export async function getActiveGenerationJob(supabase: Client, sceneId: string) {
+  const { data, error } = await supabase
+    .from("generation_jobs")
+    .select("*")
+    .eq("scene_id", sceneId)
+    .in("status", ["queued", "processing"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export const ASSET_ROLES: { value: UploadedAsset["role"]; label: string }[] = [
   { value: "main_starting_frame", label: "Main Starting Frame" },
   { value: "ending_frame", label: "Ending Frame" },

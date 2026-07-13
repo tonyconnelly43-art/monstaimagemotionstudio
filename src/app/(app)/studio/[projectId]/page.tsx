@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { StudioWorkspace } from "@/components/studio/studio-workspace";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getProject, PROJECT_TYPES } from "@/lib/data/projects";
-import { listScenes, listSceneAssets, listSceneTakes } from "@/lib/data/scenes";
+import { listScenes, listSceneAssets, listSceneTakes, getActiveGenerationJob } from "@/lib/data/scenes";
 import { listCharacters } from "@/lib/data/characters";
 import { listHoopSquadScenes } from "@/lib/data/hoop-squad-scenes";
 
@@ -29,9 +29,13 @@ export default async function StudioProjectPage({
   ]);
 
   const activeScene = scenes.find((s) => s.id === sceneIdParam) ?? scenes[0] ?? null;
-  const [assets, takes] = activeScene
-    ? await Promise.all([listSceneAssets(supabase, activeScene.id), listSceneTakes(supabase, activeScene.id)])
-    : [[], []];
+  const [assets, takes, activeJob] = activeScene
+    ? await Promise.all([
+        listSceneAssets(supabase, activeScene.id),
+        listSceneTakes(supabase, activeScene.id),
+        getActiveGenerationJob(supabase, activeScene.id),
+      ])
+    : [[], [], null];
 
   return (
     <div className="flex h-full flex-col">
@@ -44,6 +48,7 @@ export default async function StudioProjectPage({
         }
       />
       <StudioWorkspace
+        key={activeScene?.id ?? "none"}
         project={project}
         scenes={scenes}
         characters={characters}
@@ -51,6 +56,7 @@ export default async function StudioProjectPage({
         activeScene={activeScene}
         assets={assets}
         takes={takes}
+        initialActiveJobId={activeJob?.id ?? null}
       />
     </div>
   );

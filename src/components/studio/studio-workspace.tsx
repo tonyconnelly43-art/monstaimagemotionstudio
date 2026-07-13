@@ -26,6 +26,7 @@ export function StudioWorkspace({
   activeScene,
   assets,
   takes,
+  initialActiveJobId,
 }: {
   project: Project;
   scenes: Scene[];
@@ -34,9 +35,15 @@ export function StudioWorkspace({
   activeScene: Scene | null;
   assets: UploadedAsset[];
   takes: GenerationTake[];
+  initialActiveJobId: string | null;
 }) {
   const router = useRouter();
-  const [jobId, setJobId] = useState<string | null>(null);
+  // A generation started in an earlier visit (or a different tab) keeps
+  // running on fal.ai even after this page stops watching it. Seeding this
+  // from the server-fetched in-flight job means reopening the scene resumes
+  // checking instead of leaving it stuck at "processing" forever. Keyed by
+  // scene id (see the parent page), so switching scenes re-seeds this too.
+  const [jobId, setJobId] = useState<string | null>(initialActiveJobId);
 
   function onSelectScene(sceneId: string) {
     router.push(`/studio/${project.id}?scene=${sceneId}`, { scroll: false });
