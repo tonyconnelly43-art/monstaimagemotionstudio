@@ -117,7 +117,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
     }
 
     if (status.status === "failed") {
-      const message = "The model could not complete this generation. Try adjusting your inputs and generate again.";
+      const message = status.logs?.length
+        ? `The model reported an error: ${status.logs.join(" ")}`
+        : "The model could not complete this generation. Try adjusting your inputs and generate again.";
       await supabase
         .from("generation_jobs")
         .update({ status: "failed", error_message: message, error_code: "fal_failed", completed_at: new Date().toISOString() })

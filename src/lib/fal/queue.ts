@@ -1,4 +1,5 @@
 import "server-only";
+import { ApiError } from "@fal-ai/client";
 import { getFalClient } from "@/lib/fal/client";
 
 export interface QueueSubmitResult {
@@ -84,9 +85,25 @@ export async function runQueueToCompletion<T = unknown>(
   throw new Error("Timed out waiting for a response from fal.ai.");
 }
 
+/** Pulls the actual reason out of a fal ApiError/ValidationError body, when available. */
+function extractFalDetail(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const body = error.body as { detail?: unknown; message?: string } | undefined;
+  if (typeof body?.detail === "string") return body.detail;
+  if (Array.isArray(body?.detail)) {
+    const msgs = body.detail
+      .map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg) : String(d)))
+      .filter(Boolean);
+    if (msgs.length) return msgs.join("; ");
+  }
+  if (body?.message) return body.message;
+  return error.message || null;
+}
+
 /** Maps low-level fal/network failures to a message a non-technical creator can act on. */
 export function explainFalError(error: unknown): { message: string; code: string } {
   const raw = error instanceof Error ? error.message : String(error);
+  const detail = extractFalDetail(error);
   if (/401|unauthorized|invalid key/i.test(raw)) {
     return { message: "The fal.ai API key is missing or invalid. Check it in Settings.", code: "fal_auth" };
   }
@@ -101,12 +118,17 @@ export function explainFalError(error: unknown): { message: string; code: string
   }
   if (/422|validation|invalid input/i.test(raw)) {
     return {
-      message: "The selected model rejected one of the inputs (image, duration, or resolution). Try adjusting your settings.",
+      message: `The selected model rejected one of the inputs (image, duration, or resolution)${detail ? `: ${detail}` : ""}. Try adjusting your settings.`,
       code: "fal_validation",
     };
   }
   if (/network|fetch failed|ECONNRESET/i.test(raw)) {
     return { message: "Network error reaching fal.ai. Check your connection and try again.", code: "network" };
   }
-  return { message: "Generation failed for an unknown reason. You can retry or check Generation History for details.", code: "unknown" };
+  return {
+    message: detail
+      ? `Generation failed: ${detail}`
+      : "Generation failed for an unknown reason. You can retry or check Generation History for details.",
+    code: "unknown",
+  };
 }
