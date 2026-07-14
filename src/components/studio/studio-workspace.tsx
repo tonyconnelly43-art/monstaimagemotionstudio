@@ -64,7 +64,7 @@ export function StudioWorkspace({
         <div className="flex flex-1 items-center justify-center p-10 text-center text-sm text-muted-foreground">
           Add a scene from the strip below to start building this project.
         </div>
-        <div className="h-24 shrink-0">
+        <div className="sticky bottom-0 z-10 h-24 shrink-0 border-t border-border/60 bg-background">
           <SceneStrip projectId={project.id} scenes={scenes} activeSceneId={null} onSelect={onSelectScene} />
         </div>
       </div>
@@ -81,7 +81,7 @@ export function StudioWorkspace({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col">
       <div className="flex items-center gap-3 border-b border-border/60 px-4 py-2">
         <Input
           key={activeScene.id}
@@ -92,9 +92,9 @@ export function StudioWorkspace({
         <span className="text-xs text-muted-foreground">Scene {activeScene.scene_number}</span>
       </div>
 
-      <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col overflow-y-auto scrollbar-thin lg:flex-row">
-          <div className="w-full shrink-0 border-b border-border/60 p-4 lg:w-64 lg:border-b-0 lg:border-r lg:overflow-y-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col lg:flex-row">
+          <div className="w-full shrink-0 border-b border-border/60 p-4 lg:w-64 lg:border-b-0 lg:border-r">
             <h3 className="mb-3 text-sm font-medium">Visual Assets</h3>
             <AssetUploadPanel projectId={project.id} sceneId={activeScene.id} assets={assets} />
           </div>
@@ -108,7 +108,7 @@ export function StudioWorkspace({
                 onSectionsChange={(next) => persistSections(next)}
               />
             </div>
-            <Card className="m-4 flex-1 border-border/60 p-0">
+            <Card className="m-4 border-border/60 p-0">
               <PreviewPlayer scene={activeScene} projectId={project.id} takes={takes} activeJob={job} />
             </Card>
           </div>
@@ -125,7 +125,7 @@ export function StudioWorkspace({
         </div>
       </div>
 
-      <div className="h-24 shrink-0">
+      <div className="sticky bottom-0 z-10 h-24 shrink-0 border-t border-border/60 bg-background">
         <SceneStrip projectId={project.id} scenes={scenes} activeSceneId={activeScene.id} onSelect={onSelectScene} />
       </div>
     </div>

@@ -38,7 +38,7 @@ export function PreviewPlayer({
   const isGenerating = activeJob && ["queued", "processing"].includes(activeJob.status);
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3 p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Preview</h3>
         <Badge variant="outline" className="text-xs font-normal">
@@ -46,9 +46,9 @@ export function PreviewPlayer({
         </Badge>
       </div>
 
-      <div className={`grid flex-1 gap-3 ${compareTake ? "grid-cols-2" : "grid-cols-1"}`}>
+      <div className={`grid gap-3 ${compareTake ? "grid-cols-2" : "grid-cols-1"}`}>
         <div className="flex flex-col gap-2">
-          <div className="flex flex-1 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-black/40">
+          <div className="flex h-96 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-black/40">
             {isGenerating ? (
               <div className="flex w-64 flex-col items-center gap-3 p-6 text-center">
                 <Progress value={null} className="w-full animate-pulse" />
@@ -92,7 +92,7 @@ export function PreviewPlayer({
         </div>
         {compareTake ? (
           <div className="flex flex-col gap-2">
-            <div className="flex flex-1 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-black/40">
+            <div className="flex h-96 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-black/40">
               {compareTake.output_url ? (
                 <video src={compareTake.output_url} controls className="max-h-full max-w-full" />
               ) : null}

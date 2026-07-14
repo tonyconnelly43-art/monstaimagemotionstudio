@@ -93,7 +93,7 @@ export function GenerationSettingsPanel({
   const cost = estimateVideoCost(model.id, scene.duration_seconds);
 
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-4 scrollbar-thin">
+    <div className="flex flex-col gap-5 p-4">
       <div>
         <Label className="mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
           <Sparkles className="size-3.5" /> Video Model

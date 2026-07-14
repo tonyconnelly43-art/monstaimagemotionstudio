@@ -38,7 +38,7 @@ export default async function StudioProjectPage({
     : [[], [], null];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         className="shrink-0"
         title={project.name}
