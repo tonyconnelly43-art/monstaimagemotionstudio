@@ -110,9 +110,14 @@ export function HistoryTable({ rows, projects }: { rows: HistoryTakeRow[]; proje
                 <TableCell className="text-sm">{VIDEO_MODELS.find((m) => m.id === row.model_id)?.displayName ?? row.model_id}</TableCell>
                 <TableCell>
                   {row.status === "failed" ? (
-                    <Badge variant="outline" className="border-destructive/40 text-destructive">
-                      Failed
-                    </Badge>
+                    <div className="space-y-1">
+                      <Badge variant="outline" className="border-destructive/40 text-destructive">
+                        Failed
+                      </Badge>
+                      {row.error_message ? (
+                        <p className="max-w-64 text-xs text-muted-foreground">{row.error_message}</p>
+                      ) : null}
+                    </div>
                   ) : (
                     <Badge variant="secondary" className="capitalize">
                       {row.approval_status}
