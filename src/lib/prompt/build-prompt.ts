@@ -50,6 +50,10 @@ export interface BuildPromptInput {
   sceneLockStrength: ConsistencyStrength;
   hoopSquadStyleInstructions: string;
   globalNegativePrompt: string;
+  /** "basketball" = active game action; "everyday" = hangout/story moments outside the game. */
+  sceneStyleMode: "basketball" | "everyday";
+  basketballStyleInstructions: string;
+  everydayStyleInstructions: string;
 }
 
 function joinNonEmpty(parts: Array<string | null | undefined>, sep = " "): string {
@@ -67,6 +71,9 @@ export function buildFinalPrompt(input: BuildPromptInput): { prompt: string; neg
   const promptParts: string[] = [];
 
   promptParts.push(input.hoopSquadStyleInstructions);
+  promptParts.push(
+    input.sceneStyleMode === "basketball" ? input.basketballStyleInstructions : input.everydayStyleInstructions,
+  );
 
   if (input.characters.length > 0) {
     const names = input.characters.map((c) => c.name).join(", ");

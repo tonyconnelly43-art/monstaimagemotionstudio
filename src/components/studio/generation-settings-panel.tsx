@@ -123,6 +123,25 @@ export function GenerationSettingsPanel({
         )}
       </div>
 
+      <div>
+        <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Scene Style</Label>
+        <Select value={scene.style_mode} onValueChange={(v) => v && patch({ style_mode: v as "basketball" | "everyday" })}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="everyday">Everyday (Recess-style cartoon)</SelectItem>
+            <SelectItem value="basketball">Basketball (cinematic, Batman/Marvel-style)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {scene.style_mode === "basketball"
+            ? "Game moments get moodier lighting, cinematic camera work, and heroic framing."
+            : "Hangout & story moments get bright, playful Saturday-morning-cartoon energy."}{" "}
+          Edit the exact wording in Settings.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Duration</Label>

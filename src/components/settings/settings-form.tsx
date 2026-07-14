@@ -137,6 +137,34 @@ export function SettingsForm({ settings, falConfigured, supabaseConfigured }: { 
 
       <Card>
         <CardHeader>
+          <CardTitle>Scene Style Rules</CardTitle>
+          <CardDescription>
+            Automatically applied on top of the Hoop Squad style profile, based on each scene&apos;s Basketball / Everyday
+            setting in Studio.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Basketball scenes (cinematic, Batman/Marvel-style)</Label>
+            <Textarea
+              defaultValue={settings.basketball_style_instructions}
+              onBlur={(e) => patch({ basketball_style_instructions: e.target.value })}
+              rows={5}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Everyday scenes (Saturday-morning cartoon)</Label>
+            <Textarea
+              defaultValue={settings.everyday_style_instructions}
+              onBlur={(e) => patch({ everyday_style_instructions: e.target.value })}
+              rows={5}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Cost Controls</CardTitle>
           <CardDescription>Estimates only — fal.ai does not publish a pricing API. See Studio for per-generation estimates.</CardDescription>
         </CardHeader>

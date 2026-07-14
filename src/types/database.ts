@@ -194,6 +194,7 @@ export interface Database {
           scene_lock_strength: "flexible" | "balanced" | "strong" | "maximum";
           voice_settings: Json;
           generation_mode: "native_single" | "multi_shot_composite";
+          style_mode: "basketball" | "everyday";
           selected_take_id: string | null;
           notes: string | null;
           sort_order: number;
@@ -442,6 +443,8 @@ export interface Database {
           default_output_quality: string;
           hoop_squad_style_instructions: string;
           global_negative_prompt: string;
+          basketball_style_instructions: string;
+          everyday_style_instructions: string;
           spending_warning_threshold: number | null;
           daily_spending_limit: number | null;
           auto_save: boolean;

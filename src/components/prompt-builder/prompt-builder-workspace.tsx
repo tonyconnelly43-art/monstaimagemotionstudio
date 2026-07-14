@@ -53,6 +53,9 @@ export function PromptBuilderWorkspace({
         sceneLockStrength: scene.scene_lock_strength,
         hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
         globalNegativePrompt: settings?.global_negative_prompt ?? "",
+        sceneStyleMode: scene.style_mode,
+        basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
+        everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
       })
     : null;
 

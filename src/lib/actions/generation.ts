@@ -102,6 +102,9 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
     hoopSquadStyleInstructions:
       settings?.hoop_squad_style_instructions ?? "Preserve the exact approved Hoop Squad cartoon illustration style.",
     globalNegativePrompt: settings?.global_negative_prompt ?? "",
+    sceneStyleMode: scene.style_mode,
+    basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
+    everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
   });
 
   if (!prompt.trim()) {
