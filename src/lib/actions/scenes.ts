@@ -96,6 +96,37 @@ export async function reorderScenesAction(projectId: string, orderedIds: string[
   revalidatePath(`/studio/${projectId}`);
 }
 
+/**
+ * Attaches an image already saved somewhere else in the app (a character's
+ * pose/reference gallery, a saved location's view gallery) to this scene's
+ * generation inputs, without re-uploading a duplicate file. storage_path is
+ * a synthetic, never-real path — deleteAssetAction's storage cleanup is a
+ * harmless no-op for it, since the original file lives at the source's own
+ * storage path and must not be touched when this link is removed.
+ */
+export async function attachLibraryAssetAction(
+  sceneId: string,
+  projectId: string,
+  role: Database["public"]["Tables"]["uploaded_assets"]["Row"]["role"],
+  imageUrl: string,
+  label: string,
+) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("uploaded_assets").insert({
+    user_id: user.id,
+    project_id: projectId,
+    scene_id: sceneId,
+    storage_path: `linked-reference/${crypto.randomUUID()}`,
+    public_url: imageUrl,
+    file_name: label,
+    mime_type: "image/png",
+    file_size: 0,
+    role,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/studio/${projectId}`);
+}
+
 export async function deleteAssetAction(assetId: string, projectId: string) {
   const { supabase } = await requireUser();
   const { data: asset } = await supabase.from("uploaded_assets").select("storage_path").eq("id", assetId).single();

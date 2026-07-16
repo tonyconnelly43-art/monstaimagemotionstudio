@@ -45,3 +45,10 @@ export async function listCharacterReferences(supabase: Client, characterId: str
   if (error) throw error;
   return data ?? [];
 }
+
+/** All reference images for every character owned by the current user, for the Studio "pull from library" picker. */
+export async function listAllCharacterReferences(supabase: Client) {
+  const { data, error } = await supabase.from("character_references").select("*").order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}

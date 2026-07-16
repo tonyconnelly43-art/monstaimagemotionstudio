@@ -15,14 +15,16 @@ import { updateSceneAction } from "@/lib/actions/scenes";
 import { useGenerationJob } from "@/lib/hooks/use-generation-job";
 import type { Project } from "@/lib/data/projects";
 import type { Scene, UploadedAsset, GenerationTake } from "@/lib/data/scenes";
-import type { CharacterRow } from "@/lib/data/characters";
-import type { HoopSquadScene } from "@/lib/data/hoop-squad-scenes";
+import type { CharacterRow, CharacterReference } from "@/lib/data/characters";
+import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
 
 export function StudioWorkspace({
   project,
   scenes,
   characters,
   locations,
+  characterReferences,
+  sceneReferences,
   activeScene,
   assets,
   takes,
@@ -32,6 +34,8 @@ export function StudioWorkspace({
   scenes: Scene[];
   characters: CharacterRow[];
   locations: HoopSquadScene[];
+  characterReferences: CharacterReference[];
+  sceneReferences: SceneReference[];
   activeScene: Scene | null;
   assets: UploadedAsset[];
   takes: GenerationTake[];
@@ -96,7 +100,16 @@ export function StudioWorkspace({
         <div className="flex flex-col lg:flex-row">
           <div className="w-full shrink-0 border-b border-border/60 p-4 lg:w-64 lg:border-b-0 lg:border-r">
             <h3 className="mb-3 text-sm font-medium">Visual Assets</h3>
-            <AssetUploadPanel projectId={project.id} sceneId={activeScene.id} assets={assets} />
+            <AssetUploadPanel
+              projectId={project.id}
+              sceneId={activeScene.id}
+              assets={assets}
+              scene={activeScene}
+              characters={characters}
+              locations={locations}
+              characterReferences={characterReferences}
+              sceneReferences={sceneReferences}
+            />
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="border-b border-border/60 p-4">

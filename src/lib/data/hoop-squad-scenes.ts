@@ -62,6 +62,13 @@ export async function listSceneReferences(supabase: Client, hoopSquadSceneId: st
   return data ?? [];
 }
 
+/** All view references for every saved location owned by the current user, for the Studio "pull from library" picker. */
+export async function listAllSceneReferences(supabase: Client) {
+  const { data, error } = await supabase.from("scene_references").select("*").order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export type SceneTemplate = Database["public"]["Tables"]["scene_templates"]["Row"];
 
 export async function listSceneTemplates(supabase: Client) {

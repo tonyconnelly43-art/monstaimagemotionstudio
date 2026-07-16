@@ -5,8 +5,8 @@ import { StudioWorkspace } from "@/components/studio/studio-workspace";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getProject, PROJECT_TYPES } from "@/lib/data/projects";
 import { listScenes, listSceneAssets, listSceneTakes, getActiveGenerationJob } from "@/lib/data/scenes";
-import { listCharacters } from "@/lib/data/characters";
-import { listHoopSquadScenes } from "@/lib/data/hoop-squad-scenes";
+import { listCharacters, listAllCharacterReferences } from "@/lib/data/characters";
+import { listHoopSquadScenes, listAllSceneReferences } from "@/lib/data/hoop-squad-scenes";
 
 export default async function StudioProjectPage({
   params,
@@ -22,10 +22,12 @@ export default async function StudioProjectPage({
   const project = await getProject(supabase, projectId);
   if (!project) notFound();
 
-  const [scenes, characters, locations] = await Promise.all([
+  const [scenes, characters, locations, characterReferences, sceneReferences] = await Promise.all([
     listScenes(supabase, projectId),
     listCharacters(supabase),
     listHoopSquadScenes(supabase),
+    listAllCharacterReferences(supabase),
+    listAllSceneReferences(supabase),
   ]);
 
   const activeScene = scenes.find((s) => s.id === sceneIdParam) ?? scenes[0] ?? null;
@@ -53,6 +55,8 @@ export default async function StudioProjectPage({
         scenes={scenes}
         characters={characters}
         locations={locations}
+        characterReferences={characterReferences}
+        sceneReferences={sceneReferences}
         activeScene={activeScene}
         assets={assets}
         takes={takes}
