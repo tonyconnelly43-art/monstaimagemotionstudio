@@ -124,7 +124,7 @@ export function CharacterEditor({
                   {items.map((ref) => (
                     <div key={ref.id} className="group relative aspect-square overflow-hidden rounded-md border border-border/60">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={ref.image_url} alt={ref.label ?? type.label} className="size-full object-cover" />
+                      <img src={ref.image_url} alt={ref.label ?? type.label} className="size-full bg-white object-contain" />
                       <button
                         type="button"
                         onClick={() =>

@@ -123,7 +123,7 @@ export function LocationEditor({ location, references }: { location: HoopSquadSc
           {references.map((ref) => (
             <div key={ref.id} className="group relative aspect-square overflow-hidden rounded-md border border-border/60">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ref.image_url} alt={ref.view_label} className="size-full object-cover" />
+              <img src={ref.image_url} alt={ref.view_label} className="size-full bg-white object-contain" />
               <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-white">
                 {ref.view_label}
               </span>
