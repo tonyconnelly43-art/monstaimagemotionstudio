@@ -45,10 +45,16 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
   const model = getVideoModel(modelId);
   if (!model) return { error: "Selected video model is not available." };
 
-  const { data: assets } = await supabase.from("uploaded_assets").select("*").eq("scene_id", sceneId);
+  const { data: assets } = await supabase
+    .from("uploaded_assets")
+    .select("*")
+    .eq("scene_id", sceneId)
+    .order("created_at", { ascending: true });
   const byRole = (role: string) => (assets ?? []).filter((a) => a.role === role);
-  const mainFrame = byRole("main_starting_frame")[0]?.public_url;
-  const endFrame = byRole("ending_frame")[0]?.public_url;
+  // Most recently added wins when more than one is tagged the same role (e.g. a
+  // freshly AI-composed starting frame replacing an older upload).
+  const mainFrame = byRole("main_starting_frame").at(-1)?.public_url;
+  const endFrame = byRole("ending_frame").at(-1)?.public_url;
   const referenceUrls = (assets ?? [])
     .filter((a) => !["main_starting_frame", "ending_frame", "reference_video"].includes(a.role) && a.public_url)
     .map((a) => a.public_url!) as string[];

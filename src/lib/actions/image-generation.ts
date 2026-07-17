@@ -157,3 +157,88 @@ export async function generateSceneReferenceAction(
     return { error: message };
   }
 }
+
+/**
+ * Composes every selected character together in a saved location using
+ * Nano Banana Pro (each character's own reference photo goes in as an edit
+ * reference, so identities stay locked instead of the video model having to
+ * guess who's who from a single flat frame), then saves the result as the
+ * scene's Main Starting Frame — ready to animate with Generate Video.
+ */
+export async function generateSceneCompositionAction(
+  sceneId: string,
+  projectId: string,
+  characterIds: string[],
+  hoopSquadSceneId: string | null,
+  prompt: string,
+): Promise<GenerateReferenceResult> {
+  try {
+    const { supabase, user } = await requireUser();
+
+    const [{ data: characters }, { data: settings }, { data: location }] = await Promise.all([
+      characterIds.length
+        ? supabase
+            .from("characters")
+            .select("name, main_image_url, front_view_url, side_view_url, back_view_url")
+            .in("id", characterIds)
+        : Promise.resolve({ data: [] }),
+      supabase.from("app_settings").select("hoop_squad_style_instructions").eq("user_id", user.id).maybeSingle(),
+      hoopSquadSceneId
+        ? supabase
+            .from("hoop_squad_scenes")
+            .select("name, main_image_url, wide_establishing_url")
+            .eq("id", hoopSquadSceneId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const referenceImageUrls: string[] = [];
+    const characterNames: string[] = [];
+    for (const c of characters ?? []) {
+      const url = c.main_image_url ?? c.front_view_url ?? c.side_view_url ?? c.back_view_url;
+      if (url) referenceImageUrls.push(url);
+      characterNames.push(c.name);
+    }
+    const locationImage = location?.main_image_url ?? location?.wide_establishing_url ?? null;
+    if (locationImage) referenceImageUrls.push(locationImage);
+
+    const fullPrompt = [
+      settings?.hoop_squad_style_instructions,
+      characterNames.length
+        ? `Characters in this shot: ${characterNames.join(", ")}. Keep each character's exact established design from their reference photo — same face, uniform, colors, and proportions.`
+        : null,
+      location?.name ? `Setting: ${location.name}. Keep the established environment design.` : null,
+      prompt,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const blob = await generateImageBlob(fullPrompt, referenceImageUrls);
+
+    const storagePath = `${user.id}/scenes/${sceneId}/composition/${uuidv4()}.png`;
+    const { error: uploadError } = await supabase.storage
+      .from("assets")
+      .upload(storagePath, blob, { contentType: "image/png", upsert: false });
+    if (uploadError) return { error: uploadError.message };
+
+    const { data: publicUrlData } = supabase.storage.from("assets").getPublicUrl(storagePath);
+    const { error: insertError } = await supabase.from("uploaded_assets").insert({
+      user_id: user.id,
+      project_id: projectId,
+      scene_id: sceneId,
+      storage_path: storagePath,
+      public_url: publicUrlData.publicUrl,
+      file_name: "AI-composed scene.png",
+      mime_type: "image/png",
+      file_size: blob.size,
+      role: "main_starting_frame",
+    });
+    if (insertError) return { error: insertError.message };
+
+    revalidatePath(`/studio/${projectId}`);
+    return { imageUrl: publicUrlData.publicUrl };
+  } catch (err) {
+    const { message } = explainFalError(err);
+    return { error: message };
+  }
+}

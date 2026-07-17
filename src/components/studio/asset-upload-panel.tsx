@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
-import { ImagePlus, Loader2, Trash2, Video, Library } from "lucide-react";
+import { ImagePlus, Loader2, Trash2, Video, Library, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { uploadAsset } from "@/lib/supabase/upload";
 import { deleteAssetAction, attachLibraryAssetAction } from "@/lib/actions/scenes";
 import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
+import { SceneBuilderPanel } from "@/components/studio/scene-builder-panel";
 import { ASSET_ROLES, type UploadedAsset, type Scene } from "@/lib/data/scenes";
 import { CHARACTER_REFERENCE_TYPES, type CharacterRow, type CharacterReference } from "@/lib/data/characters";
 import { SCENE_VIEW_FIELDS, type HoopSquadScene, type SceneReference } from "@/lib/data/hoop-squad-scenes";
@@ -168,6 +169,9 @@ export function AssetUploadPanel({
           <TabsTrigger value="library">
             <Library className="size-3.5" /> From Library
           </TabsTrigger>
+          <TabsTrigger value="build">
+            <Sparkles className="size-3.5" /> Build Scene
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload">
@@ -264,6 +268,17 @@ export function AssetUploadPanel({
                 })()
               : null}
           </div>
+        </TabsContent>
+
+        <TabsContent value="build">
+          <SceneBuilderPanel
+            sceneId={sceneId}
+            projectId={projectId}
+            defaultCharacterIds={scene.character_ids ?? []}
+            defaultLocationId={scene.hoop_squad_scene_id}
+            characters={characters}
+            locations={locations}
+          />
         </TabsContent>
       </Tabs>
 
