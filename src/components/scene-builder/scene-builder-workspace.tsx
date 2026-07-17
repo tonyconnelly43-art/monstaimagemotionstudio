@@ -7,7 +7,7 @@ import { SceneBuilderForm } from "@/components/scene-builder/scene-builder-form"
 import type { Project } from "@/lib/data/projects";
 import type { Scene } from "@/lib/data/scenes";
 import type { CharacterRow } from "@/lib/data/characters";
-import type { HoopSquadScene } from "@/lib/data/hoop-squad-scenes";
+import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
 import type { AppSettings } from "@/lib/data/settings";
 
 export function SceneBuilderWorkspace({
@@ -15,6 +15,7 @@ export function SceneBuilderWorkspace({
   scenes,
   characters,
   locations,
+  sceneReferences,
   settings,
   initialProjectId,
   initialSceneId,
@@ -24,6 +25,7 @@ export function SceneBuilderWorkspace({
   scenes: Scene[];
   characters: CharacterRow[];
   locations: HoopSquadScene[];
+  sceneReferences: SceneReference[];
   settings: AppSettings | null;
   initialProjectId: string;
   initialSceneId: string;
@@ -92,6 +94,7 @@ export function SceneBuilderWorkspace({
           projectId={projectId}
           characters={characters}
           locations={locations}
+          sceneReferences={sceneReferences}
           settings={settings}
           currentStartingFrameUrl={currentStartingFrameUrl}
         />

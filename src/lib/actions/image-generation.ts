@@ -176,6 +176,7 @@ export async function generateSceneCompositionAction(
   projectId: string,
   placements: CharacterPlacementRequest[],
   hoopSquadSceneId: string | null,
+  locationImageUrls: string[],
   threePointPosition: ThreePointPosition,
   sceneDescription: string,
 ): Promise<GenerateReferenceResult> {
@@ -192,11 +193,7 @@ export async function generateSceneCompositionAction(
         : Promise.resolve({ data: [] }),
       supabase.from("app_settings").select("hoop_squad_style_instructions").eq("user_id", user.id).maybeSingle(),
       hoopSquadSceneId
-        ? supabase
-            .from("hoop_squad_scenes")
-            .select("name, main_image_url, wide_establishing_url")
-            .eq("id", hoopSquadSceneId)
-            .maybeSingle()
+        ? supabase.from("hoop_squad_scenes").select("name").eq("id", hoopSquadSceneId).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
 
@@ -209,8 +206,7 @@ export async function generateSceneCompositionAction(
       if (url) referenceImageUrls.push(url);
       placementInputs.push({ name: c.name, position: placement.position });
     }
-    const locationImage = location?.main_image_url ?? location?.wide_establishing_url ?? null;
-    if (locationImage) referenceImageUrls.push(locationImage);
+    referenceImageUrls.push(...locationImageUrls);
 
     const fullPrompt = buildScenePrompt({
       hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Sparkles, Loader2, RotateCcw, ImageOff } from "lucide-react";
+import { Sparkles, Loader2, RotateCcw, ImageOff, Check } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,9 +14,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import { generateSceneCompositionAction } from "@/lib/actions/image-generation";
 import { buildScenePrompt, THREE_POINT_POSITION_OPTIONS, type ThreePointPosition } from "@/lib/prompt/build-scene-prompt";
+import { locationLibraryImages } from "@/lib/reference-images";
 import type { Scene } from "@/lib/data/scenes";
 import type { CharacterRow } from "@/lib/data/characters";
-import type { HoopSquadScene } from "@/lib/data/hoop-squad-scenes";
+import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
 import type { AppSettings } from "@/lib/data/settings";
 
 export function SceneBuilderForm({
@@ -24,6 +25,7 @@ export function SceneBuilderForm({
   projectId,
   characters,
   locations,
+  sceneReferences,
   settings,
   currentStartingFrameUrl,
 }: {
@@ -31,6 +33,7 @@ export function SceneBuilderForm({
   projectId: string;
   characters: CharacterRow[];
   locations: HoopSquadScene[];
+  sceneReferences: SceneReference[];
   settings: AppSettings | null;
   currentStartingFrameUrl: string | null;
 }) {
@@ -38,6 +41,10 @@ export function SceneBuilderForm({
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>(scene.character_ids ?? []);
   const [positions, setPositions] = useState<Record<string, string>>({});
   const [locationId, setLocationId] = useState<string>(scene.hoop_squad_scene_id ?? "none");
+  const [selectedLocationImageUrls, setSelectedLocationImageUrls] = useState<string[]>(() => {
+    const initialLocation = locations.find((l) => l.id === (scene.hoop_squad_scene_id ?? ""));
+    return initialLocation?.main_image_url ? [initialLocation.main_image_url] : [];
+  });
   const [threePointPosition, setThreePointPosition] = useState<ThreePointPosition>("unspecified");
   const [sceneDescription, setSceneDescription] = useState("");
   const [pending, setPending] = useState(false);
@@ -48,8 +55,19 @@ export function SceneBuilderForm({
     setSelectedCharacterIds((prev) => (checked ? [...prev, id] : prev.filter((c) => c !== id)));
   }
 
+  function handleLocationChange(v: string) {
+    setLocationId(v);
+    const next = locations.find((l) => l.id === v);
+    setSelectedLocationImageUrls(next?.main_image_url ? [next.main_image_url] : []);
+  }
+
+  function toggleLocationImage(url: string, checked: boolean) {
+    setSelectedLocationImageUrls((prev) => (checked ? [...prev, url] : prev.filter((u) => u !== url)));
+  }
+
   const selectedCharacters = characters.filter((c) => selectedCharacterIds.includes(c.id));
   const location = locations.find((l) => l.id === locationId) ?? null;
+  const locationImages = location ? locationLibraryImages(location, sceneReferences) : [];
 
   const previewPrompt = buildScenePrompt({
     hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
@@ -70,6 +88,7 @@ export function SceneBuilderForm({
       projectId,
       selectedCharacterIds.map((id) => ({ characterId: id, position: positions[id] ?? "" })),
       locationId === "none" ? null : locationId,
+      selectedLocationImageUrls,
       threePointPosition,
       sceneDescription,
     )
@@ -121,7 +140,7 @@ export function SceneBuilderForm({
 
         <div>
           <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Location</Label>
-          <Select value={locationId} onValueChange={(v) => v && setLocationId(v)}>
+          <Select value={locationId} onValueChange={(v) => v && handleLocationChange(v)}>
             <SelectTrigger className="w-full sm:w-72">
               <SelectValue />
             </SelectTrigger>
@@ -134,6 +153,49 @@ export function SceneBuilderForm({
               ))}
             </SelectContent>
           </Select>
+
+          {location && locationImages.length > 0 ? (
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Reference photos to use ({selectedLocationImageUrls.length} selected)
+              </Label>
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                {locationImages.map((img) => {
+                  const checked = selectedLocationImageUrls.includes(img.url);
+                  return (
+                    <button
+                      key={img.key}
+                      type="button"
+                      onClick={() => toggleLocationImage(img.url, !checked)}
+                      className={`group relative aspect-square overflow-hidden rounded-md border bg-white transition-colors ${
+                        checked ? "border-primary ring-1 ring-primary" : "border-border/60"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={img.label} className="size-full object-contain" />
+                      <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-white">
+                        {img.label}
+                      </span>
+                      <ImageLightboxButton url={img.url} label={img.label} />
+                      {checked ? (
+                        <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="size-2.5" />
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pick whichever angle actually shows the court lines you need — Nano Banana composes from the real
+                photo, so the selected image matters more than the text description for geometry.
+              </p>
+            </div>
+          ) : location ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              No saved photos for this location yet — add some in Hoop Squad first.
+            </p>
+          ) : null}
         </div>
 
         <div>
