@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ImageSlotUpload } from "@/components/shared/image-slot-upload";
 import { GenerateReferenceDialog } from "@/components/shared/generate-reference-dialog";
+import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import { updateCharacterAction, deleteCharacterAction, deleteCharacterReferenceAction } from "@/lib/actions/characters";
 import { uploadCharacterProfileImage, uploadCharacterReference } from "@/lib/supabase/upload";
 import { generateCharacterReferenceAction } from "@/lib/actions/image-generation";
@@ -130,6 +131,7 @@ export function CharacterEditor({
                     <div key={ref.id} className="group relative aspect-square overflow-hidden rounded-md border border-border/60">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={ref.image_url} alt={ref.label ?? type.label} className="size-full bg-white object-contain" />
+                      <ImageLightboxButton url={ref.image_url} label={ref.label ?? type.label} />
                       <button
                         type="button"
                         onClick={() =>

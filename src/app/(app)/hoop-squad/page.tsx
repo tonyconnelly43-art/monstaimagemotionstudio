@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listHoopSquadScenes, listSceneTemplates, SCENE_CATEGORIES } from "@/lib/data/hoop-squad-scenes";
 import { NewLocationButton } from "@/components/hoop-squad/new-location-button";
 import { TemplatesList } from "@/components/hoop-squad/templates-list";
+import { ImageLightboxThumb } from "@/components/shared/image-lightbox-thumb";
 
 export default async function HoopSquadPage() {
   const supabase = await createServerSupabaseClient();
@@ -25,8 +26,7 @@ export default async function HoopSquadPage() {
             <Card className="h-full transition-colors hover:border-primary/40">
               <div className="flex aspect-video items-center justify-center overflow-hidden bg-muted/60">
                 {loc.main_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={loc.main_image_url} alt={loc.name} className="size-full object-contain" />
+                  <ImageLightboxThumb url={loc.main_image_url} label={loc.name} className="size-full bg-white object-contain" />
                 ) : (
                   <MapPinned className="size-8 text-muted-foreground/40" />
                 )}

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { uploadAsset } from "@/lib/supabase/upload";
 import { deleteAssetAction, attachLibraryAssetAction } from "@/lib/actions/scenes";
+import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import { ASSET_ROLES, type UploadedAsset, type Scene } from "@/lib/data/scenes";
 import { CHARACTER_REFERENCE_TYPES, type CharacterRow, type CharacterReference } from "@/lib/data/characters";
 import { SCENE_VIEW_FIELDS, type HoopSquadScene, type SceneReference } from "@/lib/data/hoop-squad-scenes";
@@ -275,8 +276,13 @@ export function AssetUploadPanel({
                   <Video className="size-6 text-muted-foreground" />
                 </div>
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={asset.public_url ?? undefined} alt="" className="aspect-square w-full bg-white object-contain" />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={asset.public_url ?? undefined} alt="" className="aspect-square w-full bg-white object-contain" />
+                  {asset.public_url ? (
+                    <ImageLightboxButton url={asset.public_url} label={ASSET_ROLES.find((r) => r.value === asset.role)?.label ?? "Reference"} />
+                  ) : null}
+                </>
               )}
               <Badge variant="secondary" className="absolute bottom-1 left-1 max-w-[90%] truncate text-[10px] font-normal">
                 {ASSET_ROLES.find((r) => r.value === asset.role)?.label}

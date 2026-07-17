@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listCharacters } from "@/lib/data/characters";
 import { NewCharacterButton } from "@/components/characters/new-character-button";
+import { ImageLightboxThumb } from "@/components/shared/image-lightbox-thumb";
 
 export default async function CharactersPage() {
   const supabase = await createServerSupabaseClient();
@@ -24,8 +25,7 @@ export default async function CharactersPage() {
             <Card className="h-full transition-colors hover:border-primary/40">
               <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted/60">
                 {c.main_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.main_image_url} alt={c.name} className="size-full object-contain" />
+                  <ImageLightboxThumb url={c.main_image_url} label={c.name} className="size-full bg-white object-contain" />
                 ) : (
                   <Users className="size-8 text-muted-foreground/40" />
                 )}

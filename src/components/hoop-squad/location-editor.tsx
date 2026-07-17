@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageSlotUpload } from "@/components/shared/image-slot-upload";
 import { GenerateReferenceDialog } from "@/components/shared/generate-reference-dialog";
+import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import {
   updateHoopSquadSceneAction,
   deleteHoopSquadSceneAction,
@@ -126,6 +127,7 @@ export function LocationEditor({ location, references }: { location: HoopSquadSc
             <div key={ref.id} className="group relative aspect-square overflow-hidden rounded-md border border-border/60">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={ref.image_url} alt={ref.view_label} className="size-full bg-white object-contain" />
+              <ImageLightboxButton url={ref.image_url} label={ref.view_label} />
               <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-white">
                 {ref.view_label}
               </span>
