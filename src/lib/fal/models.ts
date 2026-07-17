@@ -12,7 +12,7 @@
  * the real schema first and set `verifiedAt`.
  */
 
-export type ModelCategory = "video" | "voice" | "lipsync";
+export type ModelCategory = "video" | "voice" | "lipsync" | "image";
 
 export type ConsistencyStrength = "flexible" | "balanced" | "strong" | "maximum";
 
@@ -99,6 +99,24 @@ export interface LipsyncModelConfig {
     supportsVideoInput: boolean;
     supportsAudioInput: boolean;
     syncModes: string[];
+  };
+  verifiedAt: string | null;
+}
+
+export interface ImageModelConfig {
+  id: string;
+  category: "image";
+  displayName: string;
+  /** Text-to-image endpoint — used when no reference images are supplied. */
+  falEndpointId: string;
+  /** Image-to-image/edit endpoint — used whenever reference images are supplied, for character/location consistency. */
+  falEditEndpointId: string;
+  isWired: boolean;
+  shortDescription: string;
+  capabilities: {
+    maxReferenceImages: number;
+    aspectRatios: string[];
+    resolutions: string[];
   };
   verifiedAt: string | null;
 }
@@ -360,6 +378,36 @@ export const LIPSYNC_MODELS: LipsyncModelConfig[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Image models — for generating/editing character & location reference art
+// (verified against fal.ai/models/fal-ai/nano-banana-pro(/edit)/api)
+// ---------------------------------------------------------------------------
+
+const NANO_BANANA_ASPECT_RATIOS = ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"];
+
+export const IMAGE_MODELS: ImageModelConfig[] = [
+  {
+    id: "nano-banana-pro",
+    category: "image",
+    displayName: "Nano Banana Pro (Google)",
+    falEndpointId: "fal-ai/nano-banana-pro",
+    falEditEndpointId: "fal-ai/nano-banana-pro/edit",
+    isWired: true,
+    shortDescription:
+      "Strong character consistency and accurate text rendering (jersey numbers, logos). Uses the edit endpoint " +
+      "when reference images are supplied (up to 14 combined, consistency maintained for up to 5 people), and " +
+      "plain text-to-image otherwise.",
+    capabilities: {
+      maxReferenceImages: 14,
+      aspectRatios: NANO_BANANA_ASPECT_RATIOS,
+      resolutions: ["1K", "2K", "4K"],
+    },
+    verifiedAt: "2026-07-17",
+  },
+];
+
+export const DEFAULT_IMAGE_MODEL_ID = "nano-banana-pro";
+
+// ---------------------------------------------------------------------------
 // Lookup helpers
 // ---------------------------------------------------------------------------
 
@@ -373,6 +421,10 @@ export function getVoiceModel(id: string): VoiceModelConfig | undefined {
 
 export function getLipsyncModel(id: string): LipsyncModelConfig | undefined {
   return LIPSYNC_MODELS.find((m) => m.id === id);
+}
+
+export function getImageModel(id: string): ImageModelConfig | undefined {
+  return IMAGE_MODELS.find((m) => m.id === id);
 }
 
 export interface RecommendationInput {

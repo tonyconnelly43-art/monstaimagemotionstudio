@@ -10,12 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageSlotUpload } from "@/components/shared/image-slot-upload";
+import { GenerateReferenceDialog } from "@/components/shared/generate-reference-dialog";
 import {
   updateHoopSquadSceneAction,
   deleteHoopSquadSceneAction,
   deleteSceneReferenceAction,
 } from "@/lib/actions/hoop-squad-scenes";
 import { uploadHoopSquadSceneView, uploadSceneReference } from "@/lib/supabase/upload";
+import { generateSceneReferenceAction } from "@/lib/actions/image-generation";
 import {
   SCENE_CATEGORIES,
   SCENE_VIEW_FIELDS,
@@ -137,6 +139,14 @@ export function LocationEditor({ location, references }: { location: HoopSquadSc
             </div>
           ))}
           <AddViewSlot locationId={location.id} onDone={() => router.refresh()} />
+          <GenerateReferenceDialog
+            dialogTitle={`Generate a view for ${location.name}`}
+            hasExistingPhotos={SCENE_VIEW_FIELDS.some((v) => Boolean(location[v.field])) || references.length > 0}
+            extraLabelField={{ label: "View label", placeholder: "e.g. View from the bleachers" }}
+            onGenerate={(prompt, useExisting, viewLabel) =>
+              generateSceneReferenceAction(location.id, viewLabel, prompt, useExisting)
+            }
+          />
         </div>
       </div>
     </div>

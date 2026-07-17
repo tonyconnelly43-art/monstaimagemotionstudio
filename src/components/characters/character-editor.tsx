@@ -10,8 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ImageSlotUpload } from "@/components/shared/image-slot-upload";
+import { GenerateReferenceDialog } from "@/components/shared/generate-reference-dialog";
 import { updateCharacterAction, deleteCharacterAction, deleteCharacterReferenceAction } from "@/lib/actions/characters";
 import { uploadCharacterProfileImage, uploadCharacterReference } from "@/lib/supabase/upload";
+import { generateCharacterReferenceAction } from "@/lib/actions/image-generation";
 import { CHARACTER_REFERENCE_TYPES, type CharacterReference, type CharacterRow } from "@/lib/data/characters";
 
 const TEXT_FIELDS: { key: keyof CharacterRow; label: string; multiline?: boolean }[] = [
@@ -112,6 +114,9 @@ export function CharacterEditor({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CHARACTER_REFERENCE_TYPES.map((type) => {
             const items = references.filter((r) => r.reference_type === type.value);
+            const hasExistingPhotos =
+              Boolean(character.main_image_url || character.front_view_url || character.side_view_url || character.back_view_url) ||
+              references.length > 0;
             return (
               <div key={type.value} className="space-y-2 rounded-lg border border-border/60 p-3">
                 <div className="flex items-center justify-between">
@@ -143,6 +148,13 @@ export function CharacterEditor({
                     aspectClassName="aspect-square"
                     onUpload={(file) =>
                       uploadCharacterReference(character.id, type.value, type.label, file).then(() => router.refresh())
+                    }
+                  />
+                  <GenerateReferenceDialog
+                    dialogTitle={`Generate a ${type.label} for ${character.name}`}
+                    hasExistingPhotos={hasExistingPhotos}
+                    onGenerate={(prompt, useExisting) =>
+                      generateCharacterReferenceAction(character.id, type.value, type.label, prompt, useExisting)
                     }
                   />
                 </div>
