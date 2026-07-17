@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { runQueueToCompletion, explainFalError } from "@/lib/fal/queue";
 import { buildNanoBananaTarget, type NanoBananaOutput } from "@/lib/fal/adapters/nano-banana";
 import { DEFAULT_IMAGE_MODEL_ID } from "@/lib/fal/models";
+import { buildScenePrompt, type ThreePointPosition } from "@/lib/prompt/build-scene-prompt";
 import type { Database } from "@/types/database";
 
 type CharacterReferenceType = Database["public"]["Tables"]["character_references"]["Row"]["reference_type"];
@@ -158,6 +159,11 @@ export async function generateSceneReferenceAction(
   }
 }
 
+export interface CharacterPlacementRequest {
+  characterId: string;
+  position: string;
+}
+
 /**
  * Composes every selected character together in a saved location using
  * Nano Banana Pro (each character's own reference photo goes in as an edit
@@ -168,18 +174,20 @@ export async function generateSceneReferenceAction(
 export async function generateSceneCompositionAction(
   sceneId: string,
   projectId: string,
-  characterIds: string[],
+  placements: CharacterPlacementRequest[],
   hoopSquadSceneId: string | null,
-  prompt: string,
+  threePointPosition: ThreePointPosition,
+  sceneDescription: string,
 ): Promise<GenerateReferenceResult> {
   try {
     const { supabase, user } = await requireUser();
+    const characterIds = placements.map((p) => p.characterId);
 
     const [{ data: characters }, { data: settings }, { data: location }] = await Promise.all([
       characterIds.length
         ? supabase
             .from("characters")
-            .select("name, main_image_url, front_view_url, side_view_url, back_view_url")
+            .select("id, name, main_image_url, front_view_url, side_view_url, back_view_url")
             .in("id", characterIds)
         : Promise.resolve({ data: [] }),
       supabase.from("app_settings").select("hoop_squad_style_instructions").eq("user_id", user.id).maybeSingle(),
@@ -193,25 +201,24 @@ export async function generateSceneCompositionAction(
     ]);
 
     const referenceImageUrls: string[] = [];
-    const characterNames: string[] = [];
-    for (const c of characters ?? []) {
+    const placementInputs: { name: string; position: string }[] = [];
+    for (const placement of placements) {
+      const c = (characters ?? []).find((ch) => ch.id === placement.characterId);
+      if (!c) continue;
       const url = c.main_image_url ?? c.front_view_url ?? c.side_view_url ?? c.back_view_url;
       if (url) referenceImageUrls.push(url);
-      characterNames.push(c.name);
+      placementInputs.push({ name: c.name, position: placement.position });
     }
     const locationImage = location?.main_image_url ?? location?.wide_establishing_url ?? null;
     if (locationImage) referenceImageUrls.push(locationImage);
 
-    const fullPrompt = [
-      settings?.hoop_squad_style_instructions,
-      characterNames.length
-        ? `Characters in this shot: ${characterNames.join(", ")}. Keep each character's exact established design from their reference photo — same face, uniform, colors, and proportions.`
-        : null,
-      location?.name ? `Setting: ${location.name}. Keep the established environment design.` : null,
-      prompt,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const fullPrompt = buildScenePrompt({
+      hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
+      locationName: location?.name ?? null,
+      placements: placementInputs,
+      threePointPosition,
+      sceneDescription,
+    });
 
     const blob = await generateImageBlob(fullPrompt, referenceImageUrls);
 

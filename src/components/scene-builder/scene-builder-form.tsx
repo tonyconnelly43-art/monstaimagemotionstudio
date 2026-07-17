@@ -1,0 +1,182 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "sonner";
+import { Sparkles, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { generateSceneCompositionAction } from "@/lib/actions/image-generation";
+import { buildScenePrompt, THREE_POINT_POSITION_OPTIONS, type ThreePointPosition } from "@/lib/prompt/build-scene-prompt";
+import type { Scene } from "@/lib/data/scenes";
+import type { CharacterRow } from "@/lib/data/characters";
+import type { HoopSquadScene } from "@/lib/data/hoop-squad-scenes";
+import type { AppSettings } from "@/lib/data/settings";
+
+export function SceneBuilderForm({
+  scene,
+  projectId,
+  characters,
+  locations,
+  settings,
+}: {
+  scene: Scene;
+  projectId: string;
+  characters: CharacterRow[];
+  locations: HoopSquadScene[];
+  settings: AppSettings | null;
+}) {
+  const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>(scene.character_ids ?? []);
+  const [positions, setPositions] = useState<Record<string, string>>({});
+  const [locationId, setLocationId] = useState<string>(scene.hoop_squad_scene_id ?? "none");
+  const [threePointPosition, setThreePointPosition] = useState<ThreePointPosition>("unspecified");
+  const [sceneDescription, setSceneDescription] = useState("");
+  const [pending, setPending] = useState(false);
+
+  function toggleCharacter(id: string, checked: boolean) {
+    setSelectedCharacterIds((prev) => (checked ? [...prev, id] : prev.filter((c) => c !== id)));
+  }
+
+  const selectedCharacters = characters.filter((c) => selectedCharacterIds.includes(c.id));
+  const location = locations.find((l) => l.id === locationId) ?? null;
+
+  const previewPrompt = buildScenePrompt({
+    hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
+    locationName: location?.name ?? null,
+    placements: selectedCharacters.map((c) => ({ name: c.name, position: positions[c.id] ?? "" })),
+    threePointPosition,
+    sceneDescription,
+  });
+
+  function handleGenerate() {
+    if (!sceneDescription.trim() && !selectedCharacters.some((c) => positions[c.id]?.trim())) {
+      toast.error("Describe the scene, or give at least one character a position, first.");
+      return;
+    }
+    setPending(true);
+    generateSceneCompositionAction(
+      scene.id,
+      projectId,
+      selectedCharacterIds.map((id) => ({ characterId: id, position: positions[id] ?? "" })),
+      locationId === "none" ? null : locationId,
+      threePointPosition,
+      sceneDescription,
+    )
+      .then((result) => {
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success(`Scene composed and set as "${scene.name}"'s Main Starting Frame.`);
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Generation failed."))
+      .finally(() => setPending(false));
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="space-y-5">
+        <div>
+          <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Characters in this shot</Label>
+          {characters.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Add characters in the Character Library first.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {characters.map((c) => (
+                <div key={c.id} className="flex items-start gap-2 rounded-lg border border-border/60 p-2.5">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={selectedCharacterIds.includes(c.id)}
+                    onCheckedChange={(v) => toggleCharacter(c.id, Boolean(v))}
+                  />
+                  <div className="flex-1 space-y-1.5">
+                    <span className="text-sm font-medium">{c.name}</span>
+                    {selectedCharacterIds.includes(c.id) ? (
+                      <Input
+                        placeholder="Where & what they're doing — e.g. left wing, mid-dribble"
+                        value={positions[c.id] ?? ""}
+                        onChange={(e) => setPositions((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                        className="h-8 text-xs"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Location</Label>
+          <Select value={locationId} onValueChange={(v) => v && setLocationId(v)}>
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No location reference</SelectItem>
+              {locations.map((l) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Three-point line position</Label>
+          <Select value={threePointPosition} onValueChange={(v) => v && setThreePointPosition(v as ThreePointPosition)}>
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {THREE_POINT_POSITION_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Applies to every character checked above. For this to actually work, make sure the location&apos;s saved
+            reference photo clearly shows the court lines — Nano Banana composes from that real photo, it doesn&apos;t
+            invent court geometry from nothing.
+          </p>
+        </div>
+
+        <div>
+          <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Describe the scene</Label>
+          <Textarea
+            value={sceneDescription}
+            onChange={(e) => setSceneDescription(e.target.value)}
+            placeholder="e.g. Tense game moment, G about to release a jump shot, Dash closing out with a hand up"
+            rows={4}
+          />
+        </div>
+
+        <Button onClick={handleGenerate} disabled={pending}>
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+          Compose Scene (~$0.15)
+        </Button>
+      </div>
+
+      <Card className="h-fit">
+        <CardContent className="space-y-3 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Composition Prompt Preview</p>
+          <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs scrollbar-thin">
+            {previewPrompt || "Fill in the fields to preview the composition prompt."}
+          </pre>
+          <p className="text-xs text-muted-foreground">
+            This is the image prompt only — it has nothing to do with the video motion prompt in Studio. Composing
+            here sets &ldquo;{scene.name}&rdquo;&apos;s Main Starting Frame; head to Studio and hit Generate Video to
+            animate it.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

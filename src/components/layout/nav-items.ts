@@ -9,6 +9,7 @@ import {
   History,
   Settings,
   MapPinned,
+  Camera,
 } from "lucide-react";
 
 export interface NavItem {
@@ -25,7 +26,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/characters", label: "Characters", icon: Users, description: "Character library & consistency" },
   { href: "/voices", label: "Voices", icon: Mic2, description: "Character voice profiles" },
   { href: "/audio", label: "Audio", icon: Music4, description: "Dialogue, music & sound effects" },
-  { href: "/prompt-builder", label: "Prompt Builder", icon: Wand2, description: "Guided prompt construction" },
+  { href: "/scene-builder", label: "Scene Builder", icon: Camera, description: "Compose the exact shot with AI before animating it" },
+  { href: "/prompt-builder", label: "Prompt Builder", icon: Wand2, description: "Guided video-motion prompt construction" },
   { href: "/history", label: "Generation History", icon: History, description: "Every take, searchable" },
   { href: "/settings", label: "Settings", icon: Settings, description: "Models, defaults & diagnostics" },
 ];

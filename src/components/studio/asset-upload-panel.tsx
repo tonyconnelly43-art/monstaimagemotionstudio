@@ -3,6 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
+import Link from "next/link";
 import { ImagePlus, Loader2, Trash2, Video, Library, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { uploadAsset } from "@/lib/supabase/upload";
 import { deleteAssetAction, attachLibraryAssetAction } from "@/lib/actions/scenes";
 import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
-import { SceneBuilderPanel } from "@/components/studio/scene-builder-panel";
 import { ASSET_ROLES, type UploadedAsset, type Scene } from "@/lib/data/scenes";
 import { CHARACTER_REFERENCE_TYPES, type CharacterRow, type CharacterReference } from "@/lib/data/characters";
 import { SCENE_VIEW_FIELDS, type HoopSquadScene, type SceneReference } from "@/lib/data/hoop-squad-scenes";
@@ -163,14 +163,20 @@ export function AssetUploadPanel({
         </Select>
       </div>
 
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        render={<Link href={`/scene-builder?project=${projectId}&scene=${sceneId}`} />}
+      >
+        <Sparkles className="size-3.5" /> Compose this scene with AI (Scene Builder)
+      </Button>
+
       <Tabs defaultValue="upload">
         <TabsList className="w-full">
           <TabsTrigger value="upload">Upload File</TabsTrigger>
           <TabsTrigger value="library">
             <Library className="size-3.5" /> From Library
-          </TabsTrigger>
-          <TabsTrigger value="build">
-            <Sparkles className="size-3.5" /> Build Scene
           </TabsTrigger>
         </TabsList>
 
@@ -268,17 +274,6 @@ export function AssetUploadPanel({
                 })()
               : null}
           </div>
-        </TabsContent>
-
-        <TabsContent value="build">
-          <SceneBuilderPanel
-            sceneId={sceneId}
-            projectId={projectId}
-            defaultCharacterIds={scene.character_ids ?? []}
-            defaultLocationId={scene.hoop_squad_scene_id}
-            characters={characters}
-            locations={locations}
-          />
         </TabsContent>
       </Tabs>
 
