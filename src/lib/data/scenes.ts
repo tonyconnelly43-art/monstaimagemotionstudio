@@ -39,6 +39,20 @@ export async function listSceneAssets(supabase: Client, sceneId: string) {
   return data ?? [];
 }
 
+/** The most recently added Main Starting Frame for a scene, or null if none has been set yet. */
+export async function getCurrentStartingFrame(supabase: Client, sceneId: string) {
+  const { data, error } = await supabase
+    .from("uploaded_assets")
+    .select("public_url")
+    .eq("scene_id", sceneId)
+    .eq("role", "main_starting_frame")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.public_url ?? null;
+}
+
 export async function listSceneTakes(supabase: Client, sceneId: string) {
   const { data, error } = await supabase
     .from("generation_takes")

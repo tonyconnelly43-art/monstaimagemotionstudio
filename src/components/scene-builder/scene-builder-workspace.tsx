@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { SceneBuilderForm } from "@/components/scene-builder/scene-builder-form";
@@ -18,19 +18,26 @@ export function SceneBuilderWorkspace({
   settings,
   initialProjectId,
   initialSceneId,
+  currentStartingFrameUrl,
 }: {
   projects: Project[];
   scenes: Scene[];
   characters: CharacterRow[];
   locations: HoopSquadScene[];
   settings: AppSettings | null;
-  initialProjectId?: string;
-  initialSceneId?: string;
+  initialProjectId: string;
+  initialSceneId: string;
+  currentStartingFrameUrl: string | null;
 }) {
-  const [projectId, setProjectId] = useState(initialProjectId ?? projects[0]?.id ?? "");
+  const router = useRouter();
+  const projectId = initialProjectId;
   const projectScenes = scenes.filter((s) => s.project_id === projectId);
-  const [sceneId, setSceneId] = useState(initialSceneId ?? projectScenes[0]?.id ?? "");
-  const scene = scenes.find((s) => s.id === sceneId) ?? projectScenes[0] ?? null;
+  const sceneId = initialSceneId;
+  const scene = scenes.find((s) => s.id === sceneId) ?? null;
+
+  function goTo(nextProjectId: string, nextSceneId: string) {
+    router.push(`/scene-builder?project=${nextProjectId}&scene=${nextSceneId}`);
+  }
 
   if (projects.length === 0) {
     return <p className="p-6 text-sm text-muted-foreground">Create a project in Studio first, then come back here to build its scenes.</p>;
@@ -45,9 +52,8 @@ export function SceneBuilderWorkspace({
             value={projectId}
             onValueChange={(v) => {
               if (!v) return;
-              setProjectId(v);
               const next = scenes.find((s) => s.project_id === v);
-              setSceneId(next?.id ?? "");
+              goTo(v, next?.id ?? "");
             }}
           >
             <SelectTrigger className="w-56">
@@ -64,7 +70,7 @@ export function SceneBuilderWorkspace({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Scene</Label>
-          <Select value={sceneId} onValueChange={(v) => v && setSceneId(v)}>
+          <Select value={sceneId} onValueChange={(v) => v && goTo(projectId, v)}>
             <SelectTrigger className="w-56">
               <SelectValue placeholder="No scenes yet" />
             </SelectTrigger>
@@ -87,6 +93,7 @@ export function SceneBuilderWorkspace({
           characters={characters}
           locations={locations}
           settings={settings}
+          currentStartingFrameUrl={currentStartingFrameUrl}
         />
       ) : (
         <p className="text-sm text-muted-foreground">Add a scene to this project from Studio to start building it here.</p>

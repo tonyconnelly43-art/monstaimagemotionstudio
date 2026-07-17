@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, RotateCcw, ImageOff } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import { generateSceneCompositionAction } from "@/lib/actions/image-generation";
 import { buildScenePrompt, THREE_POINT_POSITION_OPTIONS, type ThreePointPosition } from "@/lib/prompt/build-scene-prompt";
 import type { Scene } from "@/lib/data/scenes";
@@ -23,19 +25,24 @@ export function SceneBuilderForm({
   characters,
   locations,
   settings,
+  currentStartingFrameUrl,
 }: {
   scene: Scene;
   projectId: string;
   characters: CharacterRow[];
   locations: HoopSquadScene[];
   settings: AppSettings | null;
+  currentStartingFrameUrl: string | null;
 }) {
+  const router = useRouter();
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>(scene.character_ids ?? []);
   const [positions, setPositions] = useState<Record<string, string>>({});
   const [locationId, setLocationId] = useState<string>(scene.hoop_squad_scene_id ?? "none");
   const [threePointPosition, setThreePointPosition] = useState<ThreePointPosition>("unspecified");
   const [sceneDescription, setSceneDescription] = useState("");
   const [pending, setPending] = useState(false);
+  const [lastGeneratedUrl, setLastGeneratedUrl] = useState<string | null>(null);
+  const previewUrl = lastGeneratedUrl ?? currentStartingFrameUrl;
 
   function toggleCharacter(id: string, checked: boolean) {
     setSelectedCharacterIds((prev) => (checked ? [...prev, id] : prev.filter((c) => c !== id)));
@@ -72,6 +79,8 @@ export function SceneBuilderForm({
           return;
         }
         toast.success(`Scene composed and set as "${scene.name}"'s Main Starting Frame.`);
+        if (result.imageUrl) setLastGeneratedUrl(result.imageUrl);
+        router.refresh();
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : "Generation failed."))
       .finally(() => setPending(false));
@@ -159,24 +168,61 @@ export function SceneBuilderForm({
         </div>
 
         <Button onClick={handleGenerate} disabled={pending}>
-          {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          Compose Scene (~$0.15)
+          {pending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : previewUrl ? (
+            <RotateCcw className="size-4" />
+          ) : (
+            <Sparkles className="size-4" />
+          )}
+          {previewUrl ? "Regenerate Scene (~$0.15)" : "Compose Scene (~$0.15)"}
         </Button>
+        {previewUrl ? (
+          <p className="text-xs text-muted-foreground">
+            Not right? Tweak the fields above and hit Regenerate — it overwrites this same starting frame, no need to
+            clean up the old one.
+          </p>
+        ) : null}
       </div>
 
-      <Card className="h-fit">
-        <CardContent className="space-y-3 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Composition Prompt Preview</p>
-          <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs scrollbar-thin">
-            {previewPrompt || "Fill in the fields to preview the composition prompt."}
-          </pre>
-          <p className="text-xs text-muted-foreground">
-            This is the image prompt only — it has nothing to do with the video motion prompt in Studio. Composing
-            here sets &ldquo;{scene.name}&rdquo;&apos;s Main Starting Frame; head to Studio and hit Generate Video to
-            animate it.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card className="h-fit">
+          <CardContent className="space-y-3 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {lastGeneratedUrl ? "Just Composed" : "Current Main Starting Frame"}
+            </p>
+            {previewUrl ? (
+              <div className="group relative aspect-square overflow-hidden rounded-md border border-border/60 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewUrl} alt={`${scene.name} starting frame`} className="size-full object-contain" />
+                <ImageLightboxButton url={previewUrl} label={`${scene.name} starting frame`} />
+              </div>
+            ) : (
+              <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border/60 text-xs text-muted-foreground">
+                <ImageOff className="size-6" />
+                No starting frame set yet
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              This is what Studio will use as &ldquo;{scene.name}&rdquo;&apos;s Main Starting Frame right now.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="h-fit">
+          <CardContent className="space-y-3 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Composition Prompt Preview</p>
+            <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs scrollbar-thin">
+              {previewPrompt || "Fill in the fields to preview the composition prompt."}
+            </pre>
+            <p className="text-xs text-muted-foreground">
+              This is the image prompt only — it has nothing to do with the video motion prompt in Studio. Composing
+              here sets &ldquo;{scene.name}&rdquo;&apos;s Main Starting Frame; head to Studio and hit Generate Video to
+              animate it.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
