@@ -6,7 +6,43 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+/**
+ * Walks the JSX children looking for SelectItem elements so their
+ * value/label pairs can be handed to Root's `items` prop. Without that,
+ * `<Select.Value>` can't resolve a label for the current value until the
+ * popup has been opened at least once (a base-ui quirk) — every Select
+ * that pre-selects a value on mount would show the raw value instead of
+ * its label until the user manually opened the dropdown.
+ */
+function extractItemsFromChildren(children: React.ReactNode): { value: unknown; label: React.ReactNode }[] {
+  const items: { value: unknown; label: React.ReactNode }[] = []
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child)) return
+    if (child.type === SelectItem) {
+      const itemProps = child.props as { value: unknown; children: React.ReactNode }
+      items.push({ value: itemProps.value, label: itemProps.children })
+      return
+    }
+    const childProps = child.props as { children?: React.ReactNode } | undefined
+    if (childProps?.children) {
+      items.push(...extractItemsFromChildren(childProps.children))
+    }
+  })
+  return items
+}
+
+function Select<Value, Multiple extends boolean | undefined = false>({
+  items,
+  children,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple>) {
+  const resolvedItems = items ?? (children ? extractItemsFromChildren(children) : undefined)
+  return (
+    <SelectPrimitive.Root items={resolvedItems} {...props}>
+      {children}
+    </SelectPrimitive.Root>
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
