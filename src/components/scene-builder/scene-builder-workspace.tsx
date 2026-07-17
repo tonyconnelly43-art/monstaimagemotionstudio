@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { SceneBuilderForm } from "@/components/scene-builder/scene-builder-form";
 import type { Project } from "@/lib/data/projects";
 import type { Scene } from "@/lib/data/scenes";
-import type { CharacterRow } from "@/lib/data/characters";
+import type { CharacterRow, CharacterReference } from "@/lib/data/characters";
 import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
 import type { AppSettings } from "@/lib/data/settings";
 
@@ -14,6 +14,7 @@ export function SceneBuilderWorkspace({
   projects,
   scenes,
   characters,
+  characterReferences,
   locations,
   sceneReferences,
   settings,
@@ -24,6 +25,7 @@ export function SceneBuilderWorkspace({
   projects: Project[];
   scenes: Scene[];
   characters: CharacterRow[];
+  characterReferences: CharacterReference[];
   locations: HoopSquadScene[];
   sceneReferences: SceneReference[];
   settings: AppSettings | null;
@@ -93,6 +95,7 @@ export function SceneBuilderWorkspace({
           scene={scene}
           projectId={projectId}
           characters={characters}
+          characterReferences={characterReferences}
           locations={locations}
           sceneReferences={sceneReferences}
           settings={settings}

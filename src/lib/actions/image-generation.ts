@@ -162,6 +162,8 @@ export async function generateSceneReferenceAction(
 export interface CharacterPlacementRequest {
   characterId: string;
   position: string;
+  /** Specific saved pose/expression photos to use for this character; falls back to their Main photo if empty. */
+  imageUrls: string[];
 }
 
 /**
@@ -202,8 +204,9 @@ export async function generateSceneCompositionAction(
     for (const placement of placements) {
       const c = (characters ?? []).find((ch) => ch.id === placement.characterId);
       if (!c) continue;
-      const url = c.main_image_url ?? c.front_view_url ?? c.side_view_url ?? c.back_view_url;
-      if (url) referenceImageUrls.push(url);
+      const fallbackUrl = c.main_image_url ?? c.front_view_url ?? c.side_view_url ?? c.back_view_url;
+      const urls = placement.imageUrls.length ? placement.imageUrls : fallbackUrl ? [fallbackUrl] : [];
+      referenceImageUrls.push(...urls);
       placementInputs.push({ name: c.name, position: placement.position });
     }
     referenceImageUrls.push(...locationImageUrls);

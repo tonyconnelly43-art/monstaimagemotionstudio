@@ -14,9 +14,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import { generateSceneCompositionAction } from "@/lib/actions/image-generation";
 import { buildScenePrompt, THREE_POINT_POSITION_OPTIONS, type ThreePointPosition } from "@/lib/prompt/build-scene-prompt";
-import { locationLibraryImages } from "@/lib/reference-images";
+import { characterLibraryImages, locationLibraryImages } from "@/lib/reference-images";
 import type { Scene } from "@/lib/data/scenes";
-import type { CharacterRow } from "@/lib/data/characters";
+import type { CharacterRow, CharacterReference } from "@/lib/data/characters";
 import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
 import type { AppSettings } from "@/lib/data/settings";
 
@@ -24,6 +24,7 @@ export function SceneBuilderForm({
   scene,
   projectId,
   characters,
+  characterReferences,
   locations,
   sceneReferences,
   settings,
@@ -32,6 +33,7 @@ export function SceneBuilderForm({
   scene: Scene;
   projectId: string;
   characters: CharacterRow[];
+  characterReferences: CharacterReference[];
   locations: HoopSquadScene[];
   sceneReferences: SceneReference[];
   settings: AppSettings | null;
@@ -40,6 +42,15 @@ export function SceneBuilderForm({
   const router = useRouter();
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>(scene.character_ids ?? []);
   const [positions, setPositions] = useState<Record<string, string>>({});
+  const [characterImageSelections, setCharacterImageSelections] = useState<Record<string, string[]>>(() => {
+    const initial: Record<string, string[]> = {};
+    for (const id of scene.character_ids ?? []) {
+      const c = characters.find((ch) => ch.id === id);
+      const defaultUrl = c?.main_image_url ?? c?.front_view_url ?? c?.side_view_url ?? c?.back_view_url;
+      initial[id] = defaultUrl ? [defaultUrl] : [];
+    }
+    return initial;
+  });
   const [locationId, setLocationId] = useState<string>(scene.hoop_squad_scene_id ?? "none");
   const [selectedLocationImageUrls, setSelectedLocationImageUrls] = useState<string[]>(() => {
     const initialLocation = locations.find((l) => l.id === (scene.hoop_squad_scene_id ?? ""));
@@ -53,6 +64,21 @@ export function SceneBuilderForm({
 
   function toggleCharacter(id: string, checked: boolean) {
     setSelectedCharacterIds((prev) => (checked ? [...prev, id] : prev.filter((c) => c !== id)));
+    if (checked) {
+      setCharacterImageSelections((prev) => {
+        if (prev[id]?.length) return prev;
+        const c = characters.find((ch) => ch.id === id);
+        const defaultUrl = c?.main_image_url ?? c?.front_view_url ?? c?.side_view_url ?? c?.back_view_url;
+        return { ...prev, [id]: defaultUrl ? [defaultUrl] : [] };
+      });
+    }
+  }
+
+  function toggleCharacterImage(characterId: string, url: string, checked: boolean) {
+    setCharacterImageSelections((prev) => {
+      const current = prev[characterId] ?? [];
+      return { ...prev, [characterId]: checked ? [...current, url] : current.filter((u) => u !== url) };
+    });
   }
 
   function handleLocationChange(v: string) {
@@ -86,7 +112,11 @@ export function SceneBuilderForm({
     generateSceneCompositionAction(
       scene.id,
       projectId,
-      selectedCharacterIds.map((id) => ({ characterId: id, position: positions[id] ?? "" })),
+      selectedCharacterIds.map((id) => ({
+        characterId: id,
+        position: positions[id] ?? "",
+        imageUrls: characterImageSelections[id] ?? [],
+      })),
       locationId === "none" ? null : locationId,
       selectedLocationImageUrls,
       threePointPosition,
@@ -113,27 +143,73 @@ export function SceneBuilderForm({
           {characters.length === 0 ? (
             <p className="text-sm text-muted-foreground">Add characters in the Character Library first.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {characters.map((c) => (
-                <div key={c.id} className="flex items-start gap-2 rounded-lg border border-border/60 p-2.5">
-                  <Checkbox
-                    className="mt-0.5"
-                    checked={selectedCharacterIds.includes(c.id)}
-                    onCheckedChange={(v) => toggleCharacter(c.id, Boolean(v))}
-                  />
-                  <div className="flex-1 space-y-1.5">
-                    <span className="text-sm font-medium">{c.name}</span>
-                    {selectedCharacterIds.includes(c.id) ? (
-                      <Input
-                        placeholder="Where & what they're doing — e.g. left wing, mid-dribble"
-                        value={positions[c.id] ?? ""}
-                        onChange={(e) => setPositions((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                        className="h-8 text-xs"
+            <div className="space-y-2">
+              {characters.map((c) => {
+                const checked = selectedCharacterIds.includes(c.id);
+                const poseImages = checked ? characterLibraryImages(c, characterReferences) : [];
+                const selectedPoseUrls = characterImageSelections[c.id] ?? [];
+                return (
+                  <div key={c.id} className="rounded-lg border border-border/60 p-2.5">
+                    <div className="flex items-start gap-2">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={checked}
+                        onCheckedChange={(v) => toggleCharacter(c.id, Boolean(v))}
                       />
+                      <div className="flex-1 space-y-1.5">
+                        <span className="text-sm font-medium">{c.name}</span>
+                        {checked ? (
+                          <Input
+                            placeholder="Where & what they're doing — e.g. left wing, mid-dribble"
+                            value={positions[c.id] ?? ""}
+                            onChange={(e) => setPositions((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                            className="h-8 text-xs"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {checked && poseImages.length > 0 ? (
+                      <div className="mt-2.5 space-y-1.5 pl-6">
+                        <Label className="text-xs text-muted-foreground">
+                          Poses & expressions to use ({selectedPoseUrls.length} selected)
+                        </Label>
+                        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+                          {poseImages.map((img) => {
+                            const imgChecked = selectedPoseUrls.includes(img.url);
+                            return (
+                              <button
+                                key={img.key}
+                                type="button"
+                                onClick={() => toggleCharacterImage(c.id, img.url, !imgChecked)}
+                                className={`group relative aspect-square overflow-hidden rounded-md border bg-white transition-colors ${
+                                  imgChecked ? "border-primary ring-1 ring-primary" : "border-border/60"
+                                }`}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={img.url} alt={img.label} className="size-full object-contain" />
+                                <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-white">
+                                  {img.label}
+                                </span>
+                                <ImageLightboxButton url={img.url} label={img.label} />
+                                {imgChecked ? (
+                                  <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                    <Check className="size-2.5" />
+                                  </span>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : checked ? (
+                      <p className="mt-2 pl-6 text-xs text-muted-foreground">
+                        No saved photos for {c.name} yet — add some in the Character Library first.
+                      </p>
                     ) : null}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
