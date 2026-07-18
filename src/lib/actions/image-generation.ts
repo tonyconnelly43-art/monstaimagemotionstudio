@@ -25,22 +25,36 @@ async function requireUser() {
   return { supabase, user };
 }
 
-/** Runs the fal.ai image generation and downloads the result as a Blob, ready to store. */
-async function generateImageBlob(prompt: string, referenceImageUrls: string[]) {
+/** Runs the fal.ai image generation and downloads every result as a Blob, ready to store. */
+export async function generateImageBlobs(
+  prompt: string,
+  referenceImageUrls: string[],
+  numImages: number,
+  aspectRatio = "1:1",
+): Promise<Blob[]> {
   const { falEndpointId, input } = buildNanoBananaTarget({
     modelId: DEFAULT_IMAGE_MODEL_ID,
     prompt,
     referenceImageUrls,
-    aspectRatio: "1:1",
-    numImages: 1,
+    aspectRatio,
+    numImages,
   });
-  const result = await runQueueToCompletion<NanoBananaOutput>(falEndpointId, input, 60_000);
-  const image = result.images[0];
-  if (!image) throw new Error("The model did not return an image. Try again.");
+  const result = await runQueueToCompletion<NanoBananaOutput>(falEndpointId, input, 90_000);
+  if (!result.images.length) throw new Error("The model did not return any images. Try again.");
 
-  const res = await fetch(image.url);
-  if (!res.ok) throw new Error("Could not download the generated image.");
-  return res.blob();
+  return Promise.all(
+    result.images.map(async (image) => {
+      const res = await fetch(image.url);
+      if (!res.ok) throw new Error("Could not download a generated image.");
+      return res.blob();
+    }),
+  );
+}
+
+/** Runs the fal.ai image generation and downloads the result as a Blob, ready to store. */
+async function generateImageBlob(prompt: string, referenceImageUrls: string[]) {
+  const [blob] = await generateImageBlobs(prompt, referenceImageUrls, 1);
+  return blob;
 }
 
 /**

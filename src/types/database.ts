@@ -472,6 +472,60 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["generation_rate_limits"]["Row"]>;
         Relationships: [];
       };
+      brand_projects: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          company_info: string | null;
+          mascot_favorite_url: string | null;
+          wordmark_favorite_url: string | null;
+          background_favorite_url: string | null;
+          final_brand_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["brand_projects"]["Row"]> & { user_id: string; name: string };
+        Update: Partial<Database["public"]["Tables"]["brand_projects"]["Row"]>;
+        Relationships: [];
+      };
+      brand_references: {
+        Row: {
+          id: string;
+          user_id: string;
+          brand_project_id: string;
+          image_url: string;
+          label: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["brand_references"]["Row"]> & {
+          user_id: string;
+          brand_project_id: string;
+          image_url: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["brand_references"]["Row"]>;
+        Relationships: [];
+      };
+      brand_generation_batches: {
+        Row: {
+          id: string;
+          user_id: string;
+          brand_project_id: string;
+          element_type: "mascot" | "wordmark" | "background";
+          prompt: string;
+          image_urls: string[];
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["brand_generation_batches"]["Row"]> & {
+          user_id: string;
+          brand_project_id: string;
+          element_type: "mascot" | "wordmark" | "background";
+          prompt: string;
+          image_urls: string[];
+        };
+        Update: Partial<Database["public"]["Tables"]["brand_generation_batches"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
