@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAppSettings } from "@/lib/data/settings";
-import { isFalConfigured, isSupabaseConfigured } from "@/lib/env";
+import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured } from "@/lib/env";
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient();
@@ -22,7 +22,12 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader title="Settings" description="Models, defaults, cost controls, and diagnostics." />
-      <SettingsForm settings={settings} falConfigured={isFalConfigured()} supabaseConfigured={isSupabaseConfigured()} />
+      <SettingsForm
+        settings={settings}
+        falConfigured={isFalConfigured()}
+        supabaseConfigured={isSupabaseConfigured()}
+        anthropicConfigured={isAnthropicConfigured()}
+      />
     </div>
   );
 }

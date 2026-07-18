@@ -12,13 +12,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VIDEO_MODELS, VOICE_MODELS } from "@/lib/fal/models";
-import { updateSettingsAction, testFalConnectionAction, testSupabaseConnectionAction, type ConnectionTestResult } from "@/lib/actions/settings";
+import {
+  updateSettingsAction,
+  testFalConnectionAction,
+  testSupabaseConnectionAction,
+  testAnthropicConnectionAction,
+  type ConnectionTestResult,
+} from "@/lib/actions/settings";
 import type { AppSettings } from "@/lib/data/settings";
 
 const ASPECT_RATIOS = ["9:16", "1:1", "16:9", "4:5"];
 const OUTPUT_QUALITIES = ["480p", "720p", "1080p", "4k"];
 
-export function SettingsForm({ settings, falConfigured, supabaseConfigured }: { settings: AppSettings; falConfigured: boolean; supabaseConfigured: boolean }) {
+export function SettingsForm({
+  settings,
+  falConfigured,
+  supabaseConfigured,
+  anthropicConfigured,
+}: {
+  settings: AppSettings;
+  falConfigured: boolean;
+  supabaseConfigured: boolean;
+  anthropicConfigured: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
 
   function patch(update: Partial<AppSettings>) {
@@ -33,7 +49,7 @@ export function SettingsForm({ settings, falConfigured, supabaseConfigured }: { 
 
   return (
     <div className="space-y-6 p-6">
-      <ConnectionsCard falConfigured={falConfigured} supabaseConfigured={supabaseConfigured} />
+      <ConnectionsCard falConfigured={falConfigured} supabaseConfigured={supabaseConfigured} anthropicConfigured={anthropicConfigured} />
 
       <Card>
         <CardHeader>
@@ -277,11 +293,21 @@ function ToggleRow({
   );
 }
 
-function ConnectionsCard({ falConfigured, supabaseConfigured }: { falConfigured: boolean; supabaseConfigured: boolean }) {
+function ConnectionsCard({
+  falConfigured,
+  supabaseConfigured,
+  anthropicConfigured,
+}: {
+  falConfigured: boolean;
+  supabaseConfigured: boolean;
+  anthropicConfigured: boolean;
+}) {
   const [falResult, setFalResult] = useState<ConnectionTestResult | null>(null);
   const [supabaseResult, setSupabaseResult] = useState<ConnectionTestResult | null>(null);
+  const [anthropicResult, setAnthropicResult] = useState<ConnectionTestResult | null>(null);
   const [testingFal, setTestingFal] = useState(false);
   const [testingSupabase, setTestingSupabase] = useState(false);
+  const [testingAnthropic, setTestingAnthropic] = useState(false);
 
   return (
     <Card>
@@ -348,6 +374,37 @@ function ConnectionsCard({ falConfigured, supabaseConfigured }: { falConfigured:
               }}
             >
               {testingSupabase ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Test connection
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 p-3">
+          <div>
+            <p className="text-sm font-medium">Claude API (AI Cinematic Prompt)</p>
+            <p className="text-xs text-muted-foreground">
+              {anthropicConfigured ? "ANTHROPIC_API_KEY is set." : "ANTHROPIC_API_KEY is missing — optional, only needed in Prompt Builder."}
+              {anthropicResult ? ` ${anthropicResult.message}` : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {anthropicResult ? (
+              anthropicResult.ok ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-destructive" />
+              )
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={testingAnthropic}
+              onClick={async () => {
+                setTestingAnthropic(true);
+                setAnthropicResult(await testAnthropicConnectionAction());
+                setTestingAnthropic(false);
+              }}
+            >
+              {testingAnthropic ? <Loader2 className="size-3.5 animate-spin" /> : null}
               Test connection
             </Button>
           </div>

@@ -5,7 +5,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFalClient } from "@/lib/fal/client";
 import { getQueueStatus } from "@/lib/fal/queue";
 import { DEFAULT_VIDEO_MODEL_ID, DEFAULT_VOICE_MODEL_ID, getVideoModel } from "@/lib/fal/models";
-import { isFalConfigured, isSupabaseConfigured } from "@/lib/env";
+import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured } from "@/lib/env";
+import { callClaude } from "@/lib/anthropic/client";
 import type { Database } from "@/types/database";
 
 async function requireUser() {
@@ -65,6 +66,18 @@ export async function testSupabaseConnectionAction(): Promise<ConnectionTestResu
     return { ok: true, message: "Supabase connection and Row Level Security check passed." };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Could not reach Supabase." };
+  }
+}
+
+export async function testAnthropicConnectionAction(): Promise<ConnectionTestResult> {
+  if (!isAnthropicConfigured()) {
+    return { ok: false, message: "ANTHROPIC_API_KEY is not set in this environment." };
+  }
+  try {
+    const { text } = await callClaude("Reply with exactly one word: OK", "Reply with exactly one word.", 10);
+    return { ok: true, message: text.trim() ? "Claude API responded — connection looks good." : "Claude responded with an empty message." };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Could not reach the Claude API." };
   }
 }
 

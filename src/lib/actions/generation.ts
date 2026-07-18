@@ -91,27 +91,37 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
 
   const { data: settings } = await supabase.from("app_settings").select("*").eq("user_id", user.id).maybeSingle();
 
-  const sections = (scene.prompt_sections as unknown as PromptSections) ?? EMPTY_PROMPT_SECTIONS;
-  const { prompt, negativePrompt } = buildFinalPrompt({
-    casualIdea: scene.casual_idea ?? "",
-    sections: { ...EMPTY_PROMPT_SECTIONS, ...sections },
-    characters,
-    location,
-    cameraAngle: scene.camera_angle,
-    timeOfDay: scene.time_of_day,
-    characterPlacements: scene.character_placements ? JSON.stringify(scene.character_placements) : null,
-    basketball: (scene.hoop_target as Record<string, string>) ?? undefined,
-    characterLock: scene.character_lock,
-    characterLockStrength: scene.character_lock_strength,
-    sceneLock: scene.scene_lock,
-    sceneLockStrength: scene.scene_lock_strength,
-    hoopSquadStyleInstructions:
-      settings?.hoop_squad_style_instructions ?? "Preserve the exact approved Hoop Squad cartoon illustration style.",
-    globalNegativePrompt: settings?.global_negative_prompt ?? "",
-    sceneStyleMode: scene.style_mode,
-    basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
-    everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
-  });
+  let prompt: string;
+  let negativePrompt: string;
+  if (scene.prompt_source === "ai_written" && scene.ai_written_prompt?.trim()) {
+    // The AI Cinematic Prompt writer already produces a complete, self-contained
+    // shot list (style, characters, and location are all folded in when it's
+    // written) — the guided builder's template assembly would be redundant here.
+    prompt = scene.ai_written_prompt.trim();
+    negativePrompt = settings?.global_negative_prompt ?? "";
+  } else {
+    const sections = (scene.prompt_sections as unknown as PromptSections) ?? EMPTY_PROMPT_SECTIONS;
+    ({ prompt, negativePrompt } = buildFinalPrompt({
+      casualIdea: scene.casual_idea ?? "",
+      sections: { ...EMPTY_PROMPT_SECTIONS, ...sections },
+      characters,
+      location,
+      cameraAngle: scene.camera_angle,
+      timeOfDay: scene.time_of_day,
+      characterPlacements: scene.character_placements ? JSON.stringify(scene.character_placements) : null,
+      basketball: (scene.hoop_target as Record<string, string>) ?? undefined,
+      characterLock: scene.character_lock,
+      characterLockStrength: scene.character_lock_strength,
+      sceneLock: scene.scene_lock,
+      sceneLockStrength: scene.scene_lock_strength,
+      hoopSquadStyleInstructions:
+        settings?.hoop_squad_style_instructions ?? "Preserve the exact approved Hoop Squad cartoon illustration style.",
+      globalNegativePrompt: settings?.global_negative_prompt ?? "",
+      sceneStyleMode: scene.style_mode,
+      basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
+      everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
+    }));
+  }
 
   if (!prompt.trim()) {
     return { error: "Add a description of the action before generating (Prompt Builder or the casual idea box)." };

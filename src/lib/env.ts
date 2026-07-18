@@ -38,6 +38,11 @@ export function isFalConfigured(): boolean {
   return Boolean(process.env.FAL_KEY);
 }
 
+/** Optional — only needed for the AI Cinematic Prompt writer, not required for the rest of the app. */
+export function isAnthropicConfigured(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&

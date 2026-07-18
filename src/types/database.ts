@@ -195,6 +195,8 @@ export interface Database {
           voice_settings: Json;
           generation_mode: "native_single" | "multi_shot_composite";
           style_mode: "basketball" | "everyday";
+          ai_written_prompt: string | null;
+          prompt_source: "guided" | "ai_written";
           selected_take_id: string | null;
           notes: string | null;
           sort_order: number;

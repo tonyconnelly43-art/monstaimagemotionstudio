@@ -32,6 +32,7 @@ Fill in `.env.local`:
 
 ```env
 FAL_KEY=                          # fal.ai API key — Dashboard → Keys
+ANTHROPIC_API_KEY=                # Optional — Anthropic Console → API Keys. Only needed for the AI Cinematic Prompt writer in Prompt Builder.
 NEXT_PUBLIC_SUPABASE_URL=         # Supabase project → Settings → API
 NEXT_PUBLIC_SUPABASE_ANON_KEY=    # Supabase project → Settings → API
 SUPABASE_SERVICE_ROLE_KEY=        # Supabase project → Settings → API (keep secret!)
