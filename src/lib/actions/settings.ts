@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFalClient } from "@/lib/fal/client";
 import { getQueueStatus } from "@/lib/fal/queue";
-import { DEFAULT_VIDEO_MODEL_ID, DEFAULT_VOICE_MODEL_ID, getVideoModel } from "@/lib/fal/models";
+import { DEFAULT_VIDEO_MODEL_ID, getVideoModel } from "@/lib/fal/models";
 import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured } from "@/lib/env";
 import { callClaude } from "@/lib/anthropic/client";
 import type { Database } from "@/types/database";
@@ -80,5 +80,3 @@ export async function testAnthropicConnectionAction(): Promise<ConnectionTestRes
     return { ok: false, message: err instanceof Error ? err.message : "Could not reach the Claude API." };
   }
 }
-
-export { DEFAULT_VIDEO_MODEL_ID, DEFAULT_VOICE_MODEL_ID };
