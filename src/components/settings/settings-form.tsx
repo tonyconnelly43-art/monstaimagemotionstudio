@@ -338,8 +338,13 @@ function ConnectionsCard({
               disabled={testingFal}
               onClick={async () => {
                 setTestingFal(true);
-                setFalResult(await testFalConnectionAction());
-                setTestingFal(false);
+                try {
+                  setFalResult(await testFalConnectionAction());
+                } catch (err) {
+                  setFalResult({ ok: false, message: err instanceof Error ? err.message : "Request failed unexpectedly." });
+                } finally {
+                  setTestingFal(false);
+                }
               }}
             >
               {testingFal ? <Loader2 className="size-3.5 animate-spin" /> : null}
@@ -369,8 +374,13 @@ function ConnectionsCard({
               disabled={testingSupabase}
               onClick={async () => {
                 setTestingSupabase(true);
-                setSupabaseResult(await testSupabaseConnectionAction());
-                setTestingSupabase(false);
+                try {
+                  setSupabaseResult(await testSupabaseConnectionAction());
+                } catch (err) {
+                  setSupabaseResult({ ok: false, message: err instanceof Error ? err.message : "Request failed unexpectedly." });
+                } finally {
+                  setTestingSupabase(false);
+                }
               }}
             >
               {testingSupabase ? <Loader2 className="size-3.5 animate-spin" /> : null}
@@ -400,8 +410,13 @@ function ConnectionsCard({
               disabled={testingAnthropic}
               onClick={async () => {
                 setTestingAnthropic(true);
-                setAnthropicResult(await testAnthropicConnectionAction());
-                setTestingAnthropic(false);
+                try {
+                  setAnthropicResult(await testAnthropicConnectionAction());
+                } catch (err) {
+                  setAnthropicResult({ ok: false, message: err instanceof Error ? err.message : "Request failed unexpectedly." });
+                } finally {
+                  setTestingAnthropic(false);
+                }
               }}
             >
               {testingAnthropic ? <Loader2 className="size-3.5 animate-spin" /> : null}
