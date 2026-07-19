@@ -4,7 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 import { useDropzone } from "react-dropzone";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Trash2, ImagePlus, Check, Wand2 } from "lucide-react";
+import { Sparkles, Loader2, Trash2, ImagePlus, Check, Wand2, Repeat } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,9 @@ import { uploadBrandReference } from "@/lib/supabase/upload";
 import {
   deleteBrandReferenceAction,
   updateBrandProjectAction,
+  updateBrandRulesAction,
   generateBrandOptionsAction,
+  generateSimilarBrandOptionsAction,
   selectBrandFavoriteAction,
   generateFinalBrandAction,
 } from "@/lib/actions/brand";
@@ -40,13 +42,20 @@ export function BrandWorkspace({
   const router = useRouter();
   const [activeType, setActiveType] = useState<BrandElementType>("mascot");
   const [prompts, setPrompts] = useState<Record<BrandElementType, string>>({ mascot: "", wordmark: "", background: "" });
+  const [rules, setRules] = useState<Record<BrandElementType, string>>({
+    mascot: project.mascot_rules ?? "",
+    wordmark: project.wordmark_rules ?? "",
+    background: project.background_rules ?? "",
+  });
   const [generating, setGenerating] = useState(false);
+  const [generatingSimilar, setGeneratingSimilar] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [finalizing, setFinalizing] = useState(false);
   const [finalPrompt, setFinalPrompt] = useState("");
 
   const latestBatch = batches.find((b) => b.element_type === activeType) ?? null;
+  const activeReferences = references.filter((r) => r.element_type === activeType);
 
   const favoriteUrls: Record<BrandElementType, string | null> = {
     mascot: project.mascot_favorite_url,
@@ -54,13 +63,14 @@ export function BrandWorkspace({
     background: project.background_favorite_url,
   };
   const allFavoritesSet = Boolean(favoriteUrls.mascot && favoriteUrls.wordmark && favoriteUrls.background);
+  const activeFavorite = favoriteUrls[activeType];
 
   const onDrop = useCallback(
     async (files: File[]) => {
       setUploading(true);
       try {
         for (const file of files) {
-          await uploadBrandReference(project.id, file.name, file);
+          await uploadBrandReference(project.id, activeType, file.name, file);
         }
         toast.success(`Uploaded ${files.length} reference${files.length > 1 ? "s" : ""}.`);
         router.refresh();
@@ -70,7 +80,7 @@ export function BrandWorkspace({
         setUploading(false);
       }
     },
-    [project.id, router],
+    [project.id, activeType, router],
   );
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -101,6 +111,22 @@ export function BrandWorkspace({
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : "Generation failed."))
       .finally(() => setGenerating(false));
+  }
+
+  function handleGenerateSimilar() {
+    if (!activeFavorite) return;
+    setGeneratingSimilar(true);
+    generateSimilarBrandOptionsAction(project.id, activeType, activeFavorite, prompts[activeType])
+      .then((result) => {
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success("Generated 2 more like your favorite.");
+        router.refresh();
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Generation failed."))
+      .finally(() => setGeneratingSimilar(false));
   }
 
   function handleSelectFavorite(url: string) {
@@ -146,8 +172,21 @@ export function BrandWorkspace({
         </div>
       </div>
 
+      <Tabs value={activeType} onValueChange={(v) => v && setActiveType(v as BrandElementType)}>
+        <TabsList className="w-full">
+          {BRAND_ELEMENT_TYPES.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              {t.label}
+              {favoriteUrls[t.value] ? <Check className="size-3 text-success" /> : null}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
       <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Reference Photos</Label>
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          {BRAND_ELEMENT_TYPES.find((t) => t.value === activeType)?.label} Reference Photos
+        </Label>
         <div
           {...getRootProps()}
           className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors ${
@@ -161,12 +200,13 @@ export function BrandWorkspace({
             <ImagePlus className="size-6 text-muted-foreground" />
           )}
           <p className="text-xs text-muted-foreground">
-            Drag & drop reference images here (from KickCharge/Fortitude portfolios, competitor logos, mood boards, etc).
+            Drag & drop references for this {BRAND_ELEMENT_TYPES.find((t) => t.value === activeType)?.label.toLowerCase()} only
+            (KickCharge/Fortitude portfolio shots, competitor logos, mood boards).
           </p>
         </div>
-        {references.length > 0 ? (
+        {activeReferences.length > 0 ? (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-            {references.map((ref) => (
+            {activeReferences.map((ref) => (
               <div key={ref.id} className="group relative aspect-square overflow-hidden rounded-md border border-border/60 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={ref.image_url} alt={ref.label ?? "Reference"} className="size-full object-contain" />
@@ -181,21 +221,26 @@ export function BrandWorkspace({
               </div>
             ))}
           </div>
-        ) : null}
+        ) : (
+          <p className="text-xs text-muted-foreground">No references yet for this element — it&apos;ll generate from the rules and prompt alone.</p>
+        )}
       </div>
 
-      <Tabs value={activeType} onValueChange={(v) => v && setActiveType(v as BrandElementType)}>
-        <TabsList className="w-full">
-          {BRAND_ELEMENT_TYPES.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label}
-              {favoriteUrls[t.value] ? <Check className="size-3 text-success" /> : null}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          {BRAND_ELEMENT_TYPES.find((t) => t.value === activeType)?.label} Generation Rules
+        </Label>
+        <Textarea
+          value={rules[activeType]}
+          onChange={(e) => setRules((prev) => ({ ...prev, [activeType]: e.target.value }))}
+          onBlur={(e) => void updateBrandRulesAction(project.id, activeType, e.target.value)}
+          placeholder="Standing style direction for this element only — applied automatically to every generation, on top of the reference photos above."
+          rows={3}
+        />
+      </div>
 
       <div className="space-y-3">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Describe this generation</Label>
         <Textarea
           value={prompts[activeType]}
           onChange={(e) => setPrompts((prev) => ({ ...prev, [activeType]: e.target.value }))}
@@ -208,10 +253,18 @@ export function BrandWorkspace({
           }
           rows={3}
         />
-        <Button onClick={handleGenerate} disabled={generating}>
-          {generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          Generate 3 {BRAND_ELEMENT_TYPES.find((t) => t.value === activeType)?.label} Options (~$0.45)
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={handleGenerate} disabled={generating}>
+            {generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            Generate 3 {BRAND_ELEMENT_TYPES.find((t) => t.value === activeType)?.label} Options (~$0.45)
+          </Button>
+          {activeFavorite ? (
+            <Button variant="outline" onClick={handleGenerateSimilar} disabled={generatingSimilar}>
+              {generatingSimilar ? <Loader2 className="size-4 animate-spin" /> : <Repeat className="size-4" />}
+              Generate 2 More Like Favorite (~$0.30)
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div>

@@ -160,13 +160,20 @@ export async function uploadVoiceCloneReference(voiceId: string, file: File) {
   return uploadAudioFile(user.id, ["voices", voiceId], file);
 }
 
-/** Uploads a Home Service Brand Generator reference photo (from KickCharge/Fortitude-style research, etc). */
-export async function uploadBrandReference(brandProjectId: string, label: string, file: File) {
+type BrandElementType = Database["public"]["Tables"]["brand_references"]["Row"]["element_type"];
+
+/** Uploads a Home Service Brand Generator reference photo, scoped to one element type's own reference pool. */
+export async function uploadBrandReference(
+  brandProjectId: string,
+  elementType: BrandElementType,
+  label: string,
+  file: File,
+) {
   const { supabase, user } = await requireBrowserUser();
-  const { url } = await uploadToAssetsBucket(user.id, ["brand", brandProjectId, "references"], file);
+  const { url } = await uploadToAssetsBucket(user.id, ["brand", brandProjectId, elementType, "references"], file);
   const { data, error } = await supabase
     .from("brand_references")
-    .insert({ user_id: user.id, brand_project_id: brandProjectId, image_url: url, label })
+    .insert({ user_id: user.id, brand_project_id: brandProjectId, element_type: elementType, image_url: url, label })
     .select("*")
     .single();
   if (error || !data) throw new Error(error?.message ?? "Could not save the reference image.");

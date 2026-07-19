@@ -482,6 +482,9 @@ export interface Database {
           wordmark_favorite_url: string | null;
           background_favorite_url: string | null;
           final_brand_url: string | null;
+          mascot_rules: string | null;
+          wordmark_rules: string | null;
+          background_rules: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -494,6 +497,7 @@ export interface Database {
           id: string;
           user_id: string;
           brand_project_id: string;
+          element_type: "mascot" | "wordmark" | "background";
           image_url: string;
           label: string | null;
           created_at: string;
@@ -501,6 +505,7 @@ export interface Database {
         Insert: Partial<Database["public"]["Tables"]["brand_references"]["Row"]> & {
           user_id: string;
           brand_project_id: string;
+          element_type: "mascot" | "wordmark" | "background";
           image_url: string;
         };
         Update: Partial<Database["public"]["Tables"]["brand_references"]["Row"]>;

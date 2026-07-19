@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { explainFalError } from "@/lib/fal/queue";
 import { generateImageBlobs } from "@/lib/actions/image-generation";
-import { BRAND_ELEMENT_TYPES, type BrandElementType } from "@/lib/data/brand";
+import { BRAND_ELEMENT_TYPES, type BrandElementType, type BrandProject } from "@/lib/data/brand";
 
 async function requireUser() {
   const supabase = await createServerSupabaseClient();
@@ -59,13 +59,33 @@ export async function deleteBrandReferenceAction(id: string, brandProjectId: str
   revalidatePath(`/brand-generator/${brandProjectId}`);
 }
 
+/** Which element_type's custom rules column applies. */
+function getElementRules(project: BrandProject, elementType: BrandElementType): string | null {
+  if (elementType === "mascot") return project.mascot_rules;
+  if (elementType === "wordmark") return project.wordmark_rules;
+  return project.background_rules;
+}
+
+export async function updateBrandRulesAction(brandProjectId: string, elementType: BrandElementType, rules: string) {
+  const { supabase } = await requireUser();
+  const patch =
+    elementType === "mascot"
+      ? { mascot_rules: rules }
+      : elementType === "wordmark"
+        ? { wordmark_rules: rules }
+        : { background_rules: rules };
+  const { error } = await supabase.from("brand_projects").update(patch).eq("id", brandProjectId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/brand-generator/${brandProjectId}`);
+}
+
 /**
  * Default style direction per element, grounded in the home-service mascot
  * branding category (KickCharge Creative, Fortitude Creative): bold cartoon
  * mascots with clean thick outlines, vibrant flat colors, and confident bold
  * wordmark lettering built for legibility on truck wraps and yard signs. The
- * uploaded reference photos are what actually lock in the exact look — this
- * text is secondary reinforcement, same architecture as Hoop Squad's style.
+ * uploaded reference photos and each element's own custom rules are what
+ * actually lock in the exact look — this text is just a baseline.
  */
 const DEFAULT_ELEMENT_STYLE: Record<BrandElementType, string> = {
   mascot:
@@ -76,13 +96,49 @@ const DEFAULT_ELEMENT_STYLE: Record<BrandElementType, string> = {
     "A flat, vibrant background pattern or brand backdrop suited to sit behind a home-service company's mascot and wordmark logo — simple geometric or thematic shapes, a complementary color palette, no text, no photorealism.",
 };
 
+/** Applies to every brand element and the final combine step: the "hand-illustrated, not sterile-AI" look the user asked for. */
+const HAND_DRAWN_TOUCH =
+  "Render it as if hand-illustrated by a professional illustrator working in Procreate: confident, deliberate linework with the natural slight variation of a real hand-drawn line, visible digital brush/ink texture, and organic shading — polished and production-ready, but with a human touch rather than looking like sterile, vector-perfect AI output.";
+
 export interface GenerateBrandOptionsResult {
   batchId?: string;
   imageUrls?: string[];
   error?: string;
 }
 
-/** Generates 3 candidate options for one brand element in a single fal.ai call. */
+type SupabaseServerClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
+
+/** Uploads generated blobs, records the batch, and returns it — shared by fresh generation and "generate similar." */
+async function saveBrandBatch(
+  supabase: SupabaseServerClient,
+  userId: string,
+  brandProjectId: string,
+  elementType: BrandElementType,
+  fullPrompt: string,
+  blobs: Blob[],
+): Promise<GenerateBrandOptionsResult> {
+  const imageUrls: string[] = [];
+  for (const blob of blobs) {
+    const storagePath = `${userId}/brand/${brandProjectId}/${elementType}/${uuidv4()}.png`;
+    const { error: uploadError } = await supabase.storage
+      .from("assets")
+      .upload(storagePath, blob, { contentType: "image/png", upsert: false });
+    if (uploadError) return { error: uploadError.message };
+    const { data: publicUrlData } = supabase.storage.from("assets").getPublicUrl(storagePath);
+    imageUrls.push(publicUrlData.publicUrl);
+  }
+
+  const { data: batch, error: insertError } = await supabase
+    .from("brand_generation_batches")
+    .insert({ user_id: userId, brand_project_id: brandProjectId, element_type: elementType, prompt: fullPrompt, image_urls: imageUrls })
+    .select("id")
+    .single();
+  if (insertError || !batch) return { error: insertError?.message ?? "Could not save the generated options." };
+
+  return { batchId: batch.id, imageUrls };
+}
+
+/** Generates 3 candidate options for one brand element, using only that element's own reference pool and rules. */
 export async function generateBrandOptionsAction(
   brandProjectId: string,
   elementType: BrandElementType,
@@ -92,13 +148,19 @@ export async function generateBrandOptionsAction(
     const { supabase, user } = await requireUser();
 
     const [{ data: project }, { data: references }] = await Promise.all([
-      supabase.from("brand_projects").select("name, company_info").eq("id", brandProjectId).maybeSingle(),
-      supabase.from("brand_references").select("image_url").eq("brand_project_id", brandProjectId),
+      supabase.from("brand_projects").select("*").eq("id", brandProjectId).maybeSingle(),
+      supabase
+        .from("brand_references")
+        .select("image_url")
+        .eq("brand_project_id", brandProjectId)
+        .eq("element_type", elementType),
     ]);
     if (!project) return { error: "Brand project not found." };
 
     const fullPrompt = [
       DEFAULT_ELEMENT_STYLE[elementType],
+      HAND_DRAWN_TOUCH,
+      getElementRules(project, elementType),
       `Company: ${project.name}.${project.company_info ? ` ${project.company_info}` : ""}`,
       prompt.trim(),
     ]
@@ -109,32 +171,63 @@ export async function generateBrandOptionsAction(
     const referenceImageUrls = (references ?? []).map((r) => r.image_url);
     const blobs = await generateImageBlobs(fullPrompt, referenceImageUrls, 3, aspectRatio);
 
-    const imageUrls: string[] = [];
-    for (const blob of blobs) {
-      const storagePath = `${user.id}/brand/${brandProjectId}/${elementType}/${uuidv4()}.png`;
-      const { error: uploadError } = await supabase.storage
-        .from("assets")
-        .upload(storagePath, blob, { contentType: "image/png", upsert: false });
-      if (uploadError) return { error: uploadError.message };
-      const { data: publicUrlData } = supabase.storage.from("assets").getPublicUrl(storagePath);
-      imageUrls.push(publicUrlData.publicUrl);
-    }
+    const result = await saveBrandBatch(supabase, user.id, brandProjectId, elementType, fullPrompt, blobs);
+    if (!result.error) revalidatePath(`/brand-generator/${brandProjectId}`);
+    return result;
+  } catch (err) {
+    const { message } = explainFalError(err);
+    return { error: message };
+  }
+}
 
-    const { data: batch, error: insertError } = await supabase
+/** Generates 2 more options that stay close to a chosen favorite, keeping the favorite in view alongside them. */
+export async function generateSimilarBrandOptionsAction(
+  brandProjectId: string,
+  elementType: BrandElementType,
+  anchorImageUrl: string,
+  prompt: string,
+): Promise<GenerateBrandOptionsResult> {
+  try {
+    const { supabase, user } = await requireUser();
+
+    const [{ data: project }, { data: references }] = await Promise.all([
+      supabase.from("brand_projects").select("*").eq("id", brandProjectId).maybeSingle(),
+      supabase
+        .from("brand_references")
+        .select("image_url")
+        .eq("brand_project_id", brandProjectId)
+        .eq("element_type", elementType),
+    ]);
+    if (!project) return { error: "Brand project not found." };
+
+    const fullPrompt = [
+      DEFAULT_ELEMENT_STYLE[elementType],
+      HAND_DRAWN_TOUCH,
+      getElementRules(project, elementType),
+      `Company: ${project.name}.${project.company_info ? ` ${project.company_info}` : ""}`,
+      "Generate close variations that follow the same overall design, pose/composition, and color palette as the anchor reference image — keep it recognizably the same concept, with only minor creative variation.",
+      prompt.trim(),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const aspectRatio = BRAND_ELEMENT_TYPES.find((t) => t.value === elementType)?.aspectRatio ?? "1:1";
+    const referenceImageUrls = [...(references ?? []).map((r) => r.image_url), anchorImageUrl];
+    const blobs = await generateImageBlobs(fullPrompt, referenceImageUrls, 2, aspectRatio);
+
+    const result = await saveBrandBatch(supabase, user.id, brandProjectId, elementType, fullPrompt, blobs);
+    if (result.error || !result.batchId) return result;
+
+    // Keep the favorite visible alongside its 2 new siblings so the preview still shows 3 to choose from.
+    const imageUrls = [anchorImageUrl, ...(result.imageUrls ?? [])];
+    const { error: updateError } = await supabase
       .from("brand_generation_batches")
-      .insert({
-        user_id: user.id,
-        brand_project_id: brandProjectId,
-        element_type: elementType,
-        prompt: fullPrompt,
-        image_urls: imageUrls,
-      })
-      .select("id")
-      .single();
-    if (insertError || !batch) return { error: insertError?.message ?? "Could not save the generated options." };
+      .update({ image_urls: imageUrls })
+      .eq("id", result.batchId);
+    if (updateError) return { error: updateError.message };
 
     revalidatePath(`/brand-generator/${brandProjectId}`);
-    return { batchId: batch.id, imageUrls };
+    return { batchId: result.batchId, imageUrls };
   } catch (err) {
     const { message } = explainFalError(err);
     return { error: message };
@@ -173,6 +266,7 @@ export async function generateFinalBrandAction(brandProjectId: string, prompt: s
       `Combine these three approved brand elements for ${project.name} into one cohesive final logo/brand presentation: the mascot character, the wordmark lettering, and the background.`,
       "Keep every element's exact design, colors, and proportions as shown in the reference images — do not redraw or restyle any of them.",
       "Arrange them into a clean, professional lockup suitable for a home service company (truck wrap, yard sign, uniform): mascot alongside or above the wordmark, set against the background.",
+      HAND_DRAWN_TOUCH,
       prompt.trim(),
     ]
       .filter(Boolean)
