@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Shapes, Download, RotateCcw } from "lucide-react";
+import { Loader2, Shapes, Download, RotateCcw, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   vectorizeBrandElementAction,
   updateBrandVectorColorsAction,
@@ -40,6 +41,7 @@ export function VectorizePanel({
   const [saving, setSaving] = useState(false);
   const [colors, setColors] = useState<string[]>(vector?.bands.map((b) => b.color) ?? []);
   const [activeVector, setActiveVector] = useState(vector);
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   function handleVectorize() {
     if (!sourceImageUrl) return;
@@ -109,7 +111,12 @@ export function VectorizePanel({
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="mx-auto aspect-square w-full max-w-xs overflow-hidden rounded-lg border border-border/60 bg-white">
+            <button
+              type="button"
+              onClick={() => setZoomOpen(true)}
+              className="group relative mx-auto aspect-square w-full max-w-xs overflow-hidden rounded-lg border border-border/60 bg-white"
+              title="Click to zoom in"
+            >
               <svg
                 viewBox={`0 0 ${activeVector.width} ${activeVector.height}`}
                 className="size-full"
@@ -119,7 +126,26 @@ export function VectorizePanel({
                   <path key={i} d={band.path} fill={colors[i] ?? band.color} stroke="none" fillRule="evenodd" />
                 ))}
               </svg>
-            </div>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+                <Maximize2 className="size-8 text-white" />
+              </div>
+            </button>
+            <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
+              <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 shadow-none ring-0">
+                <DialogTitle className="sr-only">{label} vector preview</DialogTitle>
+                <div className="mx-auto aspect-square max-h-[92vh] w-auto overflow-hidden rounded-lg bg-white">
+                  <svg
+                    viewBox={`0 0 ${activeVector.width} ${activeVector.height}`}
+                    className="size-full"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {activeVector.bands.map((band, i) => (
+                      <path key={i} d={band.path} fill={colors[i] ?? band.color} stroke="none" fillRule="evenodd" />
+                    ))}
+                  </svg>
+                </div>
+              </DialogContent>
+            </Dialog>
             <div className="space-y-2">
               {activeVector.bands.map((_, i) => (
                 <div key={i} className="flex items-center gap-2">
