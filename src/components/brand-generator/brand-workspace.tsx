@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
+import { VectorizePanel } from "@/components/brand-generator/vectorize-panel";
 import { uploadBrandReference } from "@/lib/supabase/upload";
 import {
   deleteBrandReferenceAction,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/actions/brand";
 import {
   BRAND_ELEMENT_TYPES,
+  getBrandVector,
   type BrandProject,
   type BrandReference,
   type BrandGenerationBatch,
@@ -284,7 +286,7 @@ export function BrandWorkspace({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="Generated option" className="size-full object-contain" />
-                  <ImageLightboxButton url={url} label="Generated option" />
+                  <ImageLightboxButton url={url} label="Generated option" size="large" />
                   <Button
                     size="sm"
                     variant={isFavorite ? "default" : "outline"}
@@ -330,6 +332,15 @@ export function BrandWorkspace({
         </div>
       </div>
 
+      <VectorizePanel
+        key={activeType}
+        projectId={project.id}
+        elementType={activeType}
+        label={BRAND_ELEMENT_TYPES.find((t) => t.value === activeType)?.label ?? activeType}
+        sourceImageUrl={activeFavorite}
+        vector={getBrandVector(project, activeType)}
+      />
+
       {allFavoritesSet ? (
         <Card>
           <CardContent className="space-y-3 p-4">
@@ -348,7 +359,7 @@ export function BrandWorkspace({
               <div className="group relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-lg border border-border/60 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={project.final_brand_url} alt="Final brand" className="size-full object-contain" />
-                <ImageLightboxButton url={project.final_brand_url} label="Final brand" />
+                <ImageLightboxButton url={project.final_brand_url} label="Final brand" size="large" />
               </div>
             ) : null}
           </CardContent>

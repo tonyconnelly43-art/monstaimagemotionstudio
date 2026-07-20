@@ -7,6 +7,25 @@ export type BrandReference = Database["public"]["Tables"]["brand_references"]["R
 export type BrandGenerationBatch = Database["public"]["Tables"]["brand_generation_batches"]["Row"];
 export type BrandElementType = BrandGenerationBatch["element_type"];
 
+export interface BrandVectorBand {
+  threshold: number;
+  path: string;
+  color: string;
+}
+
+export interface BrandVectorLayers {
+  width: number;
+  height: number;
+  bands: BrandVectorBand[];
+}
+
+/** Reads and type-narrows the jsonb vector column for one brand element, or null if it hasn't been vectorized yet. */
+export function getBrandVector(project: BrandProject, elementType: BrandElementType): BrandVectorLayers | null {
+  const value =
+    elementType === "mascot" ? project.mascot_vector : elementType === "wordmark" ? project.wordmark_vector : project.background_vector;
+  return (value as BrandVectorLayers | null) ?? null;
+}
+
 export const BRAND_ELEMENT_TYPES: { value: BrandElementType; label: string; aspectRatio: string }[] = [
   { value: "mascot", label: "Mascot", aspectRatio: "1:1" },
   { value: "wordmark", label: "Wordmark", aspectRatio: "16:9" },

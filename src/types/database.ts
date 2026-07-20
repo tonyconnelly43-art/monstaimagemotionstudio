@@ -485,6 +485,9 @@ export interface Database {
           mascot_rules: string | null;
           wordmark_rules: string | null;
           background_rules: string | null;
+          mascot_vector: Json | null;
+          wordmark_vector: Json | null;
+          background_vector: Json | null;
           created_at: string;
           updated_at: string;
         };

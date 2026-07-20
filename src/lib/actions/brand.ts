@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { explainFalError } from "@/lib/fal/queue";
 import { generateImageBlobs } from "@/lib/actions/image-generation";
-import { BRAND_ELEMENT_TYPES, type BrandElementType, type BrandProject } from "@/lib/data/brand";
+import { BRAND_ELEMENT_TYPES, type BrandElementType, type BrandProject, type BrandVectorLayers } from "@/lib/data/brand";
+import { vectorizeToLayers } from "@/lib/vectorize/potrace-layers";
+import type { Database } from "@/types/database";
 
 async function requireUser() {
   const supabase = await createServerSupabaseClient();
@@ -82,23 +84,26 @@ export async function updateBrandRulesAction(brandProjectId: string, elementType
 /**
  * Default style direction per element, grounded in the home-service mascot
  * branding category (KickCharge Creative, Fortitude Creative): bold cartoon
- * mascots with clean thick outlines, vibrant flat colors, and confident bold
- * wordmark lettering built for legibility on truck wraps and yard signs. The
- * uploaded reference photos and each element's own custom rules are what
- * actually lock in the exact look — this text is just a baseline.
+ * mascots with clean thick outlines and confident bold wordmark lettering
+ * built for legibility on truck wraps and yard signs. Every generation is
+ * produced as uncolored black-and-white line art on purpose — this is the
+ * pass that later gets vectorized and hand-colored in the app, so no color
+ * should ever be baked into the artwork itself. The uploaded reference
+ * photos and each element's own custom rules are what actually lock in the
+ * exact linework style — this text is just a baseline.
  */
 const DEFAULT_ELEMENT_STYLE: Record<BrandElementType, string> = {
   mascot:
-    "Bold, friendly cartoon mascot character logo mark in the style of top home-service branding agencies (KickCharge Creative, Fortitude Creative): clean thick outlines, simple geometric shapes, vibrant flat colors, confident and approachable pose and expression, isolated on a plain white background, no text.",
+    "Bold, friendly cartoon mascot character logo mark in the style of top home-service branding agencies (KickCharge Creative, Fortitude Creative): clean thick black ink outlines, simple geometric shapes, confident and approachable pose and expression, isolated on a plain white background, no text. Pure black-and-white line art — no color anywhere, black ink linework and grayscale shading only, like an uncolored coloring-book page ready to be colored in afterward.",
   wordmark:
-    "Bold, custom lettering wordmark logo type for a home service company, in the style of top home-service branding agencies: clean and highly legible at a distance (for truck wraps and yard signs), strong confident letterforms, vibrant flat colors, isolated on a plain white background, no extra imagery.",
+    "Bold, custom lettering wordmark logo type for a home service company, in the style of top home-service branding agencies: clean and highly legible at a distance (for truck wraps and yard signs), strong confident letterforms, isolated on a plain white background, no extra imagery. Pure black-and-white line art — no color, black ink outlines only.",
   background:
-    "A flat, vibrant background pattern or brand backdrop suited to sit behind a home-service company's mascot and wordmark logo — simple geometric or thematic shapes, a complementary color palette, no text, no photorealism.",
+    "A flat black-and-white background pattern or brand backdrop suited to sit behind a home-service company's mascot and wordmark logo — simple geometric or thematic shapes, no text, no photorealism. Pure black-and-white line art — no color, black ink linework and grayscale shading only.",
 };
 
 /** Applies to every brand element and the final combine step: the "hand-illustrated, not sterile-AI" look the user asked for. */
 const HAND_DRAWN_TOUCH =
-  "Render it as if hand-illustrated by a professional illustrator working in Procreate: confident, deliberate linework with the natural slight variation of a real hand-drawn line, visible digital brush/ink texture, and organic shading — polished and production-ready, but with a human touch rather than looking like sterile, vector-perfect AI output.";
+  "Render it as if hand-illustrated by a professional illustrator working in Procreate: confident, deliberate linework with the natural slight variation of a real hand-drawn line, visible digital brush/ink texture, and organic shading — polished and production-ready, but with a human touch rather than looking like sterile, vector-perfect AI output. Keep the linework clean and fully closed (no broken or open outlines) since this artwork will be vectorized and colored afterward.";
 
 export interface GenerateBrandOptionsResult {
   batchId?: string;
@@ -298,4 +303,60 @@ export async function generateFinalBrandAction(brandProjectId: string, prompt: s
     const { message } = explainFalError(err);
     return { error: message };
   }
+}
+
+function vectorColumnPatch(elementType: BrandElementType, vector: BrandVectorLayers) {
+  const value = vector as unknown as Database["public"]["Tables"]["brand_projects"]["Row"]["mascot_vector"];
+  if (elementType === "mascot") return { mascot_vector: value };
+  if (elementType === "wordmark") return { wordmark_vector: value };
+  return { background_vector: value };
+}
+
+export interface VectorizeBrandElementResult {
+  vector?: BrandVectorLayers;
+  error?: string;
+}
+
+/** Traces a generated (black-and-white) brand element image into a layered, recolorable vector and saves it. */
+export async function vectorizeBrandElementAction(
+  brandProjectId: string,
+  elementType: BrandElementType,
+  imageUrl: string,
+): Promise<VectorizeBrandElementResult> {
+  try {
+    const { supabase } = await requireUser();
+
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) return { error: "Could not fetch that image to vectorize it." };
+    const buffer = Buffer.from(await imageResponse.arrayBuffer());
+
+    const vector = await vectorizeToLayers(buffer);
+    if (vector.bands.length === 0) return { error: "Couldn't find any traceable linework in that image." };
+
+    const { error } = await supabase
+      .from("brand_projects")
+      .update(vectorColumnPatch(elementType, vector))
+      .eq("id", brandProjectId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/brand-generator/${brandProjectId}`);
+    return { vector };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not vectorize that image." };
+  }
+}
+
+/** Persists the user's chosen band colors for a vectorized element (so reopening the color editor keeps their picks). */
+export async function updateBrandVectorColorsAction(
+  brandProjectId: string,
+  elementType: BrandElementType,
+  vector: BrandVectorLayers,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from("brand_projects")
+    .update(vectorColumnPatch(elementType, vector))
+    .eq("id", brandProjectId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/brand-generator/${brandProjectId}`);
 }
