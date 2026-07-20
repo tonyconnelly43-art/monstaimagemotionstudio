@@ -28,7 +28,7 @@ export function ImageLightboxThumb({ url, label, className }: { url: string; lab
         <Maximize2 className="size-3.5" />
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 shadow-none ring-0">
+        <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 shadow-none ring-0 sm:max-w-[95vw]">
           <DialogTitle className="sr-only">{label}</DialogTitle>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={url} alt={label} className="max-h-[92vh] w-full rounded-lg bg-white object-contain" />

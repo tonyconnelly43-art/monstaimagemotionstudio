@@ -131,7 +131,7 @@ export function VectorizePanel({
               </div>
             </button>
             <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
-              <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 shadow-none ring-0">
+              <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 shadow-none ring-0 sm:max-w-[95vw]">
                 <DialogTitle className="sr-only">{label} vector preview</DialogTitle>
                 <div className="mx-auto aspect-square max-h-[92vh] w-auto overflow-hidden rounded-lg bg-white">
                   <svg
