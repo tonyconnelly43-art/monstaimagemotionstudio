@@ -286,13 +286,15 @@ export function BrandWorkspace({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="Generated option" className="size-full object-contain" />
-                  <ImageLightboxButton url={url} label="Generated option" size="large" />
+                  <ImageLightboxButton url={url} label="Generated option" />
                   <Button
                     size="sm"
                     variant={isFavorite ? "default" : "outline"}
                     disabled={isPending}
                     onClick={() => handleSelectFavorite(url)}
-                    className="absolute inset-x-2 bottom-2"
+                    className={`absolute inset-x-2 bottom-2 ${
+                      isFavorite ? "" : "border-transparent bg-black/80 text-white hover:bg-black hover:text-white"
+                    }`}
                   >
                     {isFavorite ? <Check className="size-3.5" /> : null}
                     {isFavorite ? "Favorite" : "Pick this one"}
@@ -359,7 +361,7 @@ export function BrandWorkspace({
               <div className="group relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-lg border border-border/60 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={project.final_brand_url} alt="Final brand" className="size-full object-contain" />
-                <ImageLightboxButton url={project.final_brand_url} label="Final brand" size="large" />
+                <ImageLightboxButton url={project.final_brand_url} label="Final brand" />
               </div>
             ) : null}
           </CardContent>

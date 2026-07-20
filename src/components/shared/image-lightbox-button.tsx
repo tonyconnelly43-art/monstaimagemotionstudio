@@ -9,15 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
  * delete button, etc.) to add a click-to-preview affordance without
  * disturbing whatever else that thumbnail already does on click.
  */
-export function ImageLightboxButton({
-  url,
-  label,
-  size = "default",
-}: {
-  url: string;
-  label: string;
-  size?: "default" | "large";
-}) {
+export function ImageLightboxButton({ url, label }: { url: string; label: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -34,16 +26,10 @@ export function ImageLightboxButton({
         <Maximize2 className="size-2.5" />
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          className={`border-none bg-transparent p-0 shadow-none ring-0 ${size === "large" ? "max-w-[95vw]" : "max-w-3xl"}`}
-        >
+        <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 shadow-none ring-0">
           <DialogTitle className="sr-only">{label}</DialogTitle>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={url}
-            alt={label}
-            className={`w-full rounded-lg bg-white object-contain ${size === "large" ? "max-h-[92vh]" : "max-h-[85vh]"}`}
-          />
+          <img src={url} alt={label} className="max-h-[92vh] w-full rounded-lg bg-white object-contain" />
         </DialogContent>
       </Dialog>
     </>

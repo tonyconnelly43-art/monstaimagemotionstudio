@@ -4,6 +4,9 @@ declare module "potrace" {
     blackOnWhite?: boolean;
     color?: string;
     background?: string;
+    turdSize?: number;
+    optTolerance?: number;
+    alphaMax?: number;
   }
 
   export class Potrace {

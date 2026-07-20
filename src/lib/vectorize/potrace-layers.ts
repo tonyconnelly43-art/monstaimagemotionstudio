@@ -20,9 +20,18 @@ export interface VectorLayers {
 const THRESHOLDS = [210, 165, 120, 70];
 const DEFAULT_BAND_COLORS = ["#f4e9d8", "#e2b04a", "#8a5a2b", "#241a12"];
 
+// Hand-drawn/Procreate-style artwork carries a lot of tiny brush-texture flecks
+// that potrace would otherwise trace as their own little speckle paths (the
+// "messy linework" look). turdSize suppresses speckles up to this pixel area;
+// optTolerance/alphaMax smooth the remaining real curves instead of hugging
+// every jagged pixel edge. Verified empirically against a synthetic speckled
+// test image: default settings kept ~200 speckle subpaths, these settings
+// collapsed it down to just the real shape's outline.
+const CLEANUP_OPTIONS = { turdSize: 30, optTolerance: 0.5, alphaMax: 1.2 };
+
 function loadPotrace(buffer: Buffer): Promise<Potrace> {
   return new Promise((resolve, reject) => {
-    const instance = new Potrace({ blackOnWhite: true, threshold: THRESHOLDS[0] });
+    const instance = new Potrace({ blackOnWhite: true, threshold: THRESHOLDS[0], ...CLEANUP_OPTIONS });
     instance.loadImage(buffer, (err) => {
       if (err) reject(err);
       else resolve(instance);
