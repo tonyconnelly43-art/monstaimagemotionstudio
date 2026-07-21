@@ -281,7 +281,7 @@ export async function generateFinalBrandAction(brandProjectId: string, prompt: s
 
     const fullPrompt = [
       `Show these three approved brand elements for ${project.name} applied as a full vehicle wrap on a cargo van — a realistic van wrap mockup, not a flat logo lockup.`,
-      "Layout (always follow this): the mascot character stands full-body near the FRONT of the van's side panel, positioned in front of (overlapping) the wordmark. The wordmark/badge is rendered larger than the mascot and sits more toward the middle-to-rear of the side panel, behind or beside the mascot. The background pattern fills the remaining wrap space as a supporting texture/color field behind everything, not the focal point.",
+      "Layout (always follow this): the mascot character stands full-body near the FRONT of the van's side panel, sized moderately — noticeably smaller than the wordmark, taking up roughly a third of the panel's width — positioned in front of (overlapping) the wordmark. The wordmark/badge is the dominant, largest element on the van: render it clearly bigger than the mascot, spanning the middle-to-rear two-thirds of the side panel. The background pattern fills the remaining wrap space as a supporting texture/color field behind everything, not the focal point.",
       "Include two views side by side: a full side-profile view of the van (following the layout above), and a rear/back-door view where only the wordmark/badge is shown large and centered — no full-body mascot on the back door.",
       "Keep every element's exact design and proportions unchanged from the reference images — this is a mockup of the existing brand applied to a vehicle, not a redesign of any element.",
       HAND_DRAWN_TOUCH,

@@ -13,11 +13,20 @@ export interface VectorLayers {
   bands: VectorBand[];
 }
 
-// Evenly spread thresholds from lightest (broadest silhouette, drawn first/underneath)
-// to darkest (just the core ink lines, drawn last/on top). Each threshold's traced
-// region is a strict subset of the lighter one before it, so layering them in this
-// order produces clean, non-overlapping-looking color bands out of plain B&W line art.
-const THRESHOLDS = [210, 165, 120, 70];
+// Thresholds from lightest (broadest silhouette, drawn first/underneath) to
+// darkest (just the core ink lines, drawn last/on top). Each threshold's traced
+// region is a strict subset of the lighter one before it, so layering them in
+// this order produces clean, non-overlapping-looking color bands out of plain
+// B&W line art.
+//
+// The first threshold is set close to 255 on purpose: light shading (skin
+// tone, subtle highlights inside bold lettering) commonly sits at a luminance
+// well above a "middle" threshold like 210, so a lighter band would treat it
+// as pure background and trace it as nothing at all — leaving a gap with no
+// fill in the final SVG. Verified empirically: a threshold of 210 left a
+// light-shaded test region completely untraced (transparent), while 250
+// correctly captured it as the base layer.
+const THRESHOLDS = [250, 195, 140, 80];
 const DEFAULT_BAND_COLORS = ["#f4e9d8", "#e2b04a", "#8a5a2b", "#241a12"];
 
 // Hand-drawn/Procreate-style artwork carries a lot of tiny brush-texture flecks
