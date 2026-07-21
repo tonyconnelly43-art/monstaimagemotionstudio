@@ -105,6 +105,16 @@ const DEFAULT_ELEMENT_STYLE: Record<BrandElementType, string> = {
 const HAND_DRAWN_TOUCH =
   "Render it as if hand-illustrated by a professional illustrator working in Procreate: confident, deliberate linework with the natural slight variation of a real hand-drawn line, visible digital brush/ink texture, and organic shading — polished and production-ready, but with a human touch rather than looking like sterile, vector-perfect AI output. Keep the linework clean and fully closed (no broken or open outlines) since this artwork will be vectorized and colored afterward.";
 
+/**
+ * Every generated image must be exactly one standalone design — the model
+ * otherwise tends to render a "concept sheet" of 3-4 variations laid out in
+ * one grid, which is unusable downstream: Vectorize traces the whole canvas
+ * as one flat image, so a 4-up sheet mixes all four designs' linework
+ * together into one unselectable mess instead of one clean traceable design.
+ */
+const SINGLE_DESIGN_ONLY =
+  "Critical: this image must contain exactly ONE single design, centered and filling the frame — never a grid, contact sheet, mood board, or multiple variations/options laid out together in one image. One logo only.";
+
 export interface GenerateBrandOptionsResult {
   batchId?: string;
   imageUrls?: string[];
@@ -165,6 +175,7 @@ export async function generateBrandOptionsAction(
     const fullPrompt = [
       DEFAULT_ELEMENT_STYLE[elementType],
       HAND_DRAWN_TOUCH,
+      SINGLE_DESIGN_ONLY,
       getElementRules(project, elementType),
       `Company: ${project.name}.${project.company_info ? ` ${project.company_info}` : ""}`,
       prompt.trim(),
@@ -208,6 +219,7 @@ export async function generateSimilarBrandOptionsAction(
     const fullPrompt = [
       DEFAULT_ELEMENT_STYLE[elementType],
       HAND_DRAWN_TOUCH,
+      SINGLE_DESIGN_ONLY,
       getElementRules(project, elementType),
       `Company: ${project.name}.${project.company_info ? ` ${project.company_info}` : ""}`,
       "Generate close variations that follow the same overall design, pose/composition, and color palette as the anchor reference image — keep it recognizably the same concept, with only minor creative variation.",
