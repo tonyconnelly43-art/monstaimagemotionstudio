@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Shapes, Download, RotateCcw, Maximize2 } from "lucide-react";
+import { Loader2, Shapes, Download, RotateCcw, Maximize2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,9 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   vectorizeBrandElementAction,
   updateBrandVectorColorsAction,
+  selectBrandFavoriteAction,
 } from "@/lib/actions/brand";
+import { uploadBrandCustomFavorite } from "@/lib/supabase/upload";
 import type { BrandElementType, BrandVectorLayers } from "@/lib/data/brand";
 
 const BAND_LABELS = ["Lightest fill", "Light shade", "Mid shade", "Ink lines"];
@@ -39,9 +41,25 @@ export function VectorizePanel({
   const router = useRouter();
   const [vectorizing, setVectorizing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingFavorite, setUploadingFavorite] = useState(false);
   const [colors, setColors] = useState<string[]>(vector?.bands.map((b) => b.color) ?? []);
   const [activeVector, setActiveVector] = useState(vector);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleUploadCustomFavorite(file: File) {
+    setUploadingFavorite(true);
+    uploadBrandCustomFavorite(projectId, elementType, file)
+      .then(async (url) => {
+        await selectBrandFavoriteAction(projectId, elementType, url);
+        setActiveVector(null);
+        setColors([]);
+        toast.success(`${label} favorite replaced — hit Vectorize to trace it.`);
+        router.refresh();
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Could not upload that image."))
+      .finally(() => setUploadingFavorite(false));
+  }
 
   function handleVectorize() {
     if (!sourceImageUrl) return;
@@ -92,14 +110,37 @@ export function VectorizePanel({
   return (
     <Card>
       <CardContent className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium">Vectorize &amp; Color — {label}</p>
-          {sourceImageUrl ? (
-            <Button size="sm" variant="outline" onClick={handleVectorize} disabled={vectorizing}>
-              {vectorizing ? <Loader2 className="size-4 animate-spin" /> : <Shapes className="size-4" />}
-              {activeVector ? "Re-vectorize" : "Vectorize"}
+          <div className="flex flex-wrap gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) handleUploadCustomFavorite(file);
+              }}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFavorite}
+              title="If a generation came back as a multi-design sheet, crop out the one you like in any image editor and upload it here as your favorite instead."
+            >
+              {uploadingFavorite ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+              Upload Cropped Design
             </Button>
-          ) : null}
+            {sourceImageUrl ? (
+              <Button size="sm" variant="outline" onClick={handleVectorize} disabled={vectorizing}>
+                {vectorizing ? <Loader2 className="size-4 animate-spin" /> : <Shapes className="size-4" />}
+                {activeVector ? "Re-vectorize" : "Vectorize"}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {!sourceImageUrl ? (

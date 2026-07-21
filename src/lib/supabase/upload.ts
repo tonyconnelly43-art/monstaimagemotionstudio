@@ -180,6 +180,18 @@ export async function uploadBrandReference(
   return data;
 }
 
+/**
+ * Uploads a manually-prepared image (e.g. a design cropped out of a
+ * multi-design "contact sheet" the model shouldn't have produced) straight
+ * to storage, with no generation batch or reference-pool row attached — the
+ * caller is expected to set it as the element's favorite directly.
+ */
+export async function uploadBrandCustomFavorite(brandProjectId: string, elementType: BrandElementType, file: File) {
+  const { user } = await requireBrowserUser();
+  const { url } = await uploadToAssetsBucket(user.id, ["brand", brandProjectId, elementType, "custom"], file);
+  return url;
+}
+
 /** Uploads a music/SFX/ambience/voiceover file and creates its audio_tracks row. */
 export async function uploadAudioTrack(sceneId: string, trackType: AudioTrackType, label: string, file: File) {
   const { supabase, user } = await requireBrowserUser();
