@@ -39,7 +39,7 @@ export async function generateImageBlobs(
     aspectRatio,
     numImages,
   });
-  const result = await runQueueToCompletion<NanoBananaOutput>(falEndpointId, input, 90_000);
+  const result = await runQueueToCompletion<NanoBananaOutput>(falEndpointId, input, 150_000);
   if (!result.images.length) throw new Error("The model did not return any images. Try again.");
 
   return Promise.all(
