@@ -346,19 +346,24 @@ export function BrandWorkspace({
       {allFavoritesSet ? (
         <Card>
           <CardContent className="space-y-3 p-4">
-            <p className="text-sm font-medium">Combine into the final brand</p>
+            <p className="text-sm font-medium">Van Wrap Mockup</p>
+            <p className="text-xs text-muted-foreground">
+              Combines your three favorites into a van wrap mockup: mascot full-body near the front (in front of the
+              wordmark), the wordmark bigger and set toward the middle/rear, background as the supporting wrap
+              pattern, plus a simpler rear-door view.
+            </p>
             <Textarea
               value={finalPrompt}
               onChange={(e) => setFinalPrompt(e.target.value)}
-              placeholder="Optional: any extra direction for how the three pieces should be arranged together."
+              placeholder="Optional: any extra direction (e.g. a different vehicle type, a specific setting)."
               rows={2}
             />
             <Button onClick={handleGenerateFinal} disabled={finalizing}>
               {finalizing ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-              Generate Brand Together (~$0.15)
+              Generate Van Mockup (~$0.15)
             </Button>
             {project.final_brand_url ? (
-              <div className="group relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-lg border border-border/60 bg-white">
+              <div className="group relative mx-auto aspect-video w-full max-w-2xl overflow-hidden rounded-lg border border-border/60 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={project.final_brand_url} alt="Final brand" className="size-full object-contain" />
                 <ImageLightboxButton url={project.final_brand_url} label="Final brand" />

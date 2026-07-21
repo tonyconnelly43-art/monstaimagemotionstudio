@@ -268,10 +268,12 @@ export async function generateFinalBrandAction(brandProjectId: string, prompt: s
     }
 
     const fullPrompt = [
-      `Combine these three approved brand elements for ${project.name} into one cohesive final logo/brand presentation: the mascot character, the wordmark lettering, and the background.`,
-      "Keep every element's exact design, colors, and proportions as shown in the reference images — do not redraw or restyle any of them.",
-      "Arrange them into a clean, professional lockup suitable for a home service company (truck wrap, yard sign, uniform): mascot alongside or above the wordmark, set against the background.",
+      `Show these three approved brand elements for ${project.name} applied as a full vehicle wrap on a cargo van — a realistic van wrap mockup, not a flat logo lockup.`,
+      "Layout (always follow this): the mascot character stands full-body near the FRONT of the van's side panel, positioned in front of (overlapping) the wordmark. The wordmark/badge is rendered larger than the mascot and sits more toward the middle-to-rear of the side panel, behind or beside the mascot. The background pattern fills the remaining wrap space as a supporting texture/color field behind everything, not the focal point.",
+      "Include two views side by side: a full side-profile view of the van (following the layout above), and a rear/back-door view where only the wordmark/badge is shown large and centered — no full-body mascot on the back door.",
+      "Keep every element's exact design and proportions unchanged from the reference images — this is a mockup of the existing brand applied to a vehicle, not a redesign of any element.",
       HAND_DRAWN_TOUCH,
+      "Pure black-and-white line art throughout the van illustration, no color anywhere, grayscale shading only — matching the individual brand elements' current uncolored style, ready to be colored in afterward.",
       prompt.trim(),
     ]
       .filter(Boolean)
@@ -281,7 +283,7 @@ export async function generateFinalBrandAction(brandProjectId: string, prompt: s
       fullPrompt,
       [project.mascot_favorite_url, project.wordmark_favorite_url, project.background_favorite_url],
       1,
-      "1:1",
+      "16:9",
     );
 
     const storagePath = `${user.id}/brand/${brandProjectId}/final/${uuidv4()}.png`;
