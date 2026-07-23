@@ -71,12 +71,25 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
   }
 
   let characters: CharacterForPrompt[] = [];
+  const characterLockImageUrls: string[] = [];
   if (scene.character_ids?.length) {
     const { data } = await supabase
       .from("characters")
-      .select("name, description, personality, jersey_number, approved_color_palette, negative_instructions")
+      .select(
+        "name, description, personality, jersey_number, approved_color_palette, negative_instructions, main_image_url, front_view_url, side_view_url, back_view_url",
+      )
       .in("id", scene.character_ids);
     characters = data ?? [];
+    // One canonical reference photo per locked character — this is what
+    // actually makes Character Lock do anything for the video model (the
+    // checkboxes previously only fed a text description into the Guided
+    // Builder's prompt and had zero effect in AI Cinematic Script mode).
+    // Only takes effect on a model with supportsReferenceToVideo (Seedance
+    // 2 — Reference to Video); a single-image model has no slot for these.
+    for (const c of data ?? []) {
+      const photo = c.main_image_url ?? c.front_view_url ?? c.side_view_url ?? c.back_view_url;
+      if (photo) characterLockImageUrls.push(photo);
+    }
   }
 
   let location: SceneLocationForPrompt | null = null;
@@ -132,7 +145,9 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
     prompt: `${prompt}\n\nAvoid: ${negativePrompt}`,
     imageUrl: mainFrame ?? undefined,
     endImageUrl: endFrame ?? undefined,
-    referenceImageUrls: referenceUrls,
+    // Character Lock photos first so they survive the model's reference-image
+    // cap even in scenes with several of the scene's own uploaded references.
+    referenceImageUrls: [...characterLockImageUrls, ...referenceUrls],
     referenceVideoUrls,
     resolution: undefined,
     duration: scene.duration_seconds,

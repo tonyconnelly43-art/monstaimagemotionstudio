@@ -219,6 +219,11 @@ export function GenerationSettingsPanel({
             </label>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground">
+          {model.capabilities.supportsReferenceToVideo
+            ? "Checked characters send their reference photo straight to the video model, so the same character keeps looking like themselves."
+            : `${model.displayName} only accepts one starting image, so checked characters here won't add reference photos — switch to "Seedance 2 — Reference to Video" for that. Character consistency here comes from the Main Starting Frame itself.`}
+        </p>
       </div>
 
       <div className="space-y-3 rounded-lg border border-border/60 p-3">
