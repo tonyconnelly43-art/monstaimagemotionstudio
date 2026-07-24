@@ -50,6 +50,7 @@ export const PROMPT_SECTION_LABELS: Record<keyof PromptSections, string> = {
 };
 
 export interface BasketballGuardrails {
+  shotType?: string;
   targetBasket?: string;
   playerDirection?: string;
   shootingHand?: string;

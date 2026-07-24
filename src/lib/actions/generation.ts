@@ -6,7 +6,7 @@ import { getVideoModel, DEFAULT_VIDEO_MODEL_ID } from "@/lib/fal/models";
 import { buildSeedanceInput } from "@/lib/fal/adapters/seedance";
 import { submitToQueue, explainFalError } from "@/lib/fal/queue";
 import { buildFinalPrompt, type CharacterForPrompt, type SceneLocationForPrompt } from "@/lib/prompt/build-prompt";
-import { EMPTY_PROMPT_SECTIONS, type PromptSections } from "@/lib/prompt/types";
+import { EMPTY_PROMPT_SECTIONS, DEFAULT_BASKETBALL_NEGATIVES, type PromptSections } from "@/lib/prompt/types";
 import { estimateVideoCost } from "@/lib/pricing/config";
 import { generationRequestSchema, GENERATION_RATE_LIMIT } from "@/lib/validation/generation";
 import { ASSET_ROLES } from "@/lib/data/scenes";
@@ -134,7 +134,13 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
     // shot list (style, characters, and location are all folded in when it's
     // written) — the guided builder's template assembly would be redundant here.
     prompt = scene.ai_written_prompt.trim();
-    negativePrompt = settings?.global_negative_prompt ?? "";
+    const hoopTarget = (scene.hoop_target as Record<string, string>) ?? {};
+    // The Guided Builder path adds these automatically via buildFinalPrompt;
+    // AI Cinematic Script scenes were silently skipping them entirely, even
+    // though "no shooting toward the wrong basket" and "no duplicate players"
+    // are exactly the failure modes basketball action scenes hit most.
+    const basketballNegatives = Object.values(hoopTarget).some(Boolean) ? DEFAULT_BASKETBALL_NEGATIVES.join(", ") + "." : "";
+    negativePrompt = [settings?.global_negative_prompt, basketballNegatives].filter(Boolean).join(" ");
   } else {
     const sections = (scene.prompt_sections as unknown as PromptSections) ?? EMPTY_PROMPT_SECTIONS;
     ({ prompt, negativePrompt } = buildFinalPrompt({

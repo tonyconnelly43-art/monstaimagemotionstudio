@@ -21,6 +21,7 @@ Format, exactly:
 - Weave each character's established design (name, description, jersey number, colors) naturally into the shots where it's visible — don't front-load a description block; spread identifying details across shots, using shorter references (he/she/the mascot) once a shot has already introduced someone in full.
 - If there's dialogue, embed each line in quotes inside the shot paragraph where it's actually spoken, woven into the action (e.g. he leans in and says "Wait — did you just move?") — never list dialogue separately or outside the shot paragraph.
 - Preserve every character's established design, uniform, jersey number, and the environment exactly as described in the input — never redesign or restyle anything between shots. Never invent characters, logos, on-screen text, or objects that aren't in the input.
+- If basketball court guardrails are given (shot type, target basket, court direction, defender placement, etc.), honor them literally and describe them spatially in the shot text, not just by name — e.g. if the shot type is "three-pointer," the shot description must say the shooter's feet are behind the three-point line/arc, not just "shoots the ball"; if a target basket is given, say which basket (e.g. "toward the basket at the far end") so the model doesn't send the shot at the wrong hoop. Never invent extra players, defenders, or spectators beyond what's specified.
 - After the final shot, add one blank line, then exactly two metadata lines with no blank line between them:
 Location: <location name>, <time of day>
 Audio: Diegetic sound only — natural ambience, environmental foley, subject-driven sound, and character dialogue.
@@ -101,11 +102,31 @@ export async function writeCinematicPromptAction(
       })
       .join(" | ");
 
+    const hoopTarget = (scene.hoop_target as Record<string, string>) ?? {};
+    const hoopTargetLabels: Record<string, string> = {
+      shotType: "Shot type",
+      targetBasket: "Target basket",
+      playerDirection: "Player direction",
+      shootingHand: "Shooting hand",
+      dribblingHand: "Dribbling hand",
+      startingPose: "Starting pose",
+      endingPose: "Ending pose",
+      ballOwnership: "Ball ownership",
+      defenderPlacement: "Defender placement",
+      cameraSide: "Camera side",
+      courtDirection: "Court direction",
+    };
+    const basketballGuardrailsText = Object.entries(hoopTargetLabels)
+      .map(([key, label]) => (hoopTarget[key] ? `${label}: ${hoopTarget[key]}` : null))
+      .filter(Boolean)
+      .join(". ");
+
     const userPrompt = `Total clip duration: ${scene.duration_seconds} seconds.
 Animation style: ${settings?.hoop_squad_style_instructions ?? ""} ${styleForMode ?? ""}
 Characters in this shot: ${characterLines || "none specified"}.
 Location: ${location?.name ?? "unspecified"} — ${location?.environment_description ?? ""}
 Time of day: ${scene.time_of_day ?? "unspecified — pick something that fits the scene idea"}
+Basketball court guardrails: ${basketballGuardrailsText || "none specified"}
 Dialogue in order: ${dialogueText || "none"}
 Scene idea: ${sceneIdea}
 

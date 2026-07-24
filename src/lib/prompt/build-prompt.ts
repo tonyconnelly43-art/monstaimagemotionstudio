@@ -114,6 +114,7 @@ export function buildFinalPrompt(input: BuildPromptInput): { prompt: string; neg
   if (input.basketball) {
     const b = input.basketball;
     const bball = joinNonEmpty([
+      b.shotType ? `Shot type: ${b.shotType} — the shot must actually be this type (e.g. a three-pointer means feet clearly behind the three-point arc, not a mid-range or paint shot).` : null,
       b.targetBasket ? `Target basket: ${b.targetBasket}.` : null,
       b.playerDirection ? `Player direction: ${b.playerDirection}.` : null,
       b.shootingHand ? `Shooting hand: ${b.shootingHand}.` : null,

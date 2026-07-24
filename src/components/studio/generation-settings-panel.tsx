@@ -303,6 +303,7 @@ function BasketballGuardrailsForm({
 }) {
   const target = (scene.hoop_target as Record<string, string>) ?? {};
   const fields: { key: string; label: string; placeholder: string }[] = [
+    { key: "shotType", label: "Shot Type", placeholder: "e.g. three-pointer (feet behind the arc), layup, free throw" },
     { key: "targetBasket", label: "Target Basket", placeholder: "e.g. right-side basket" },
     { key: "playerDirection", label: "Player Direction", placeholder: "e.g. moving left to right" },
     { key: "shootingHand", label: "Shooting Hand", placeholder: "e.g. right hand" },
