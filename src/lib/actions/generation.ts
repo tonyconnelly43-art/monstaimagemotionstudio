@@ -115,6 +115,33 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
     }
   }
 
+  // A character's saved voice (assigned from the Voices page) as a reference
+  // audio clip — otherwise Seedance's native audio generation invents a new
+  // voice from scratch every single time, with zero consistency between
+  // generations. Only meaningful on a model with supportsAudioReference
+  // (currently Seedance 2 — Reference to Video).
+  const characterVoiceAudioUrls: string[] = [];
+  if (scene.character_ids?.length && model.capabilities.supportsAudioReference) {
+    const { data: voices } = await supabase
+      .from("voices")
+      .select("id, reference_audio_url")
+      .in("character_id", scene.character_ids);
+    for (const voice of voices ?? []) {
+      if (voice.reference_audio_url) {
+        characterVoiceAudioUrls.push(voice.reference_audio_url);
+        continue;
+      }
+      const { data: sample } = await supabase
+        .from("voice_samples")
+        .select("audio_url")
+        .eq("voice_id", voice.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (sample?.audio_url) characterVoiceAudioUrls.push(sample.audio_url);
+    }
+  }
+
   let location: SceneLocationForPrompt | null = null;
   if (scene.hoop_squad_scene_id) {
     const { data } = await supabase
@@ -183,6 +210,7 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
     // cap even in scenes with several of the scene's own uploaded references.
     referenceImageUrls: [...characterLockImageUrls, ...referenceUrls],
     referenceVideoUrls,
+    referenceAudioUrls: characterVoiceAudioUrls,
     resolution: undefined,
     duration: scene.duration_seconds,
     aspectRatio: scene.aspect_ratio,

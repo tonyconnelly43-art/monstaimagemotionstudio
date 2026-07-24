@@ -224,6 +224,15 @@ export function GenerationSettingsPanel({
             ? "Checked characters send their reference photo straight to the video model, so the same character keeps looking like themselves."
             : `${model.displayName} only accepts one starting image, so checked characters here won't add reference photos — switch to "Seedance 2 — Reference to Video" for that. Character consistency here comes from the Main Starting Frame itself.`}
         </p>
+        {model.capabilities.supportsAudioReference ? (
+          <p className="text-xs text-muted-foreground">
+            If a checked character has dialogue, assigning them a voice on the{" "}
+            <a href="/voices" className="underline underline-offset-2">
+              Voices page
+            </a>{" "}
+            (with at least one saved sample) sends that voice along too, so they don&apos;t sound different every generation.
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-3 rounded-lg border border-border/60 p-3">
