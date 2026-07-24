@@ -10,10 +10,33 @@ import { EMPTY_PROMPT_SECTIONS, type PromptSections } from "@/lib/prompt/types";
 import { estimateVideoCost } from "@/lib/pricing/config";
 import { generationRequestSchema, GENERATION_RATE_LIMIT } from "@/lib/validation/generation";
 import { ASSET_ROLES } from "@/lib/data/scenes";
+import type { ConsistencyStrength } from "@/lib/fal/models";
 
 export interface SubmitGenerationResult {
   jobId?: string;
   error?: string;
+}
+
+/**
+ * A multi-character video generation's most common failure mode isn't a bad
+ * pose or a wrong color — it's the model losing track of *who is who*
+ * mid-clip: duplicating a character, or morphing one character's appearance
+ * into another's during a hand-off (e.g. a pass). Character Lock Strength
+ * previously only affected the Guided Builder's prompt text and did nothing
+ * at all for AI Cinematic Script scenes. This runs for both prompt sources,
+ * scaling its emphasis with the same strength setting the user already sees
+ * in Studio.
+ */
+function characterIdentityGuard(characters: CharacterForPrompt[], strength: ConsistencyStrength | null): string {
+  if (characters.length < 2) return "";
+  const names = characters.map((c) => c.name).join(", ");
+  const emphasis =
+    strength === "maximum"
+      ? "This is CRITICAL and must be followed with zero deviation: "
+      : strength === "strong"
+        ? "This is very important: "
+        : "";
+  return `${emphasis}There are exactly ${characters.length} named characters in this scene: ${names}. Keep each one visually distinct and consistent with their own established design for the entire clip — never duplicate a character into two copies of themselves, never let one character's face or body morph into another character's appearance during a hand-off or pass, and never invent extra unnamed characters beyond who's listed here.`;
 }
 
 export async function submitGenerationAction(sceneIdInput: string): Promise<SubmitGenerationResult> {
@@ -134,6 +157,11 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
       basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
       everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
     }));
+  }
+
+  if (scene.character_lock) {
+    const guard = characterIdentityGuard(characters, scene.character_lock_strength);
+    if (guard) prompt = `${prompt}\n\n${guard}`;
   }
 
   if (!prompt.trim()) {
