@@ -43,6 +43,11 @@ export function isAnthropicConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
+/** Optional — only needed for the Leads page, which reads the marketing site's own Neon database. */
+export function isWebsiteLeadsConfigured(): boolean {
+  return Boolean(process.env.WEBSITE_LEADS_DATABASE_URL);
+}
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&

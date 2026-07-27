@@ -17,6 +17,7 @@ import {
   testFalConnectionAction,
   testSupabaseConnectionAction,
   testAnthropicConnectionAction,
+  testWebsiteLeadsConnectionAction,
   type ConnectionTestResult,
 } from "@/lib/actions/settings";
 import type { AppSettings } from "@/lib/data/settings";
@@ -29,11 +30,13 @@ export function SettingsForm({
   falConfigured,
   supabaseConfigured,
   anthropicConfigured,
+  websiteLeadsConfigured,
 }: {
   settings: AppSettings;
   falConfigured: boolean;
   supabaseConfigured: boolean;
   anthropicConfigured: boolean;
+  websiteLeadsConfigured: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -49,7 +52,12 @@ export function SettingsForm({
 
   return (
     <div className="space-y-6 p-6">
-      <ConnectionsCard falConfigured={falConfigured} supabaseConfigured={supabaseConfigured} anthropicConfigured={anthropicConfigured} />
+      <ConnectionsCard
+        falConfigured={falConfigured}
+        supabaseConfigured={supabaseConfigured}
+        anthropicConfigured={anthropicConfigured}
+        websiteLeadsConfigured={websiteLeadsConfigured}
+      />
 
       <Card>
         <CardHeader>
@@ -297,17 +305,21 @@ function ConnectionsCard({
   falConfigured,
   supabaseConfigured,
   anthropicConfigured,
+  websiteLeadsConfigured,
 }: {
   falConfigured: boolean;
   supabaseConfigured: boolean;
   anthropicConfigured: boolean;
+  websiteLeadsConfigured: boolean;
 }) {
   const [falResult, setFalResult] = useState<ConnectionTestResult | null>(null);
   const [supabaseResult, setSupabaseResult] = useState<ConnectionTestResult | null>(null);
   const [anthropicResult, setAnthropicResult] = useState<ConnectionTestResult | null>(null);
+  const [websiteLeadsResult, setWebsiteLeadsResult] = useState<ConnectionTestResult | null>(null);
   const [testingFal, setTestingFal] = useState(false);
   const [testingSupabase, setTestingSupabase] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
+  const [testingWebsiteLeads, setTestingWebsiteLeads] = useState(false);
 
   return (
     <Card>
@@ -420,6 +432,44 @@ function ConnectionsCard({
               }}
             >
               {testingAnthropic ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Test connection
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 p-3">
+          <div>
+            <p className="text-sm font-medium">Website Leads (Leads page)</p>
+            <p className="text-xs text-muted-foreground">
+              {websiteLeadsConfigured
+                ? "WEBSITE_LEADS_DATABASE_URL is set."
+                : "WEBSITE_LEADS_DATABASE_URL is missing — optional, only needed for the Leads page."}
+              {websiteLeadsResult ? ` ${websiteLeadsResult.message}` : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {websiteLeadsResult ? (
+              websiteLeadsResult.ok ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-destructive" />
+              )
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={testingWebsiteLeads}
+              onClick={async () => {
+                setTestingWebsiteLeads(true);
+                try {
+                  setWebsiteLeadsResult(await testWebsiteLeadsConnectionAction());
+                } catch (err) {
+                  setWebsiteLeadsResult({ ok: false, message: err instanceof Error ? err.message : "Request failed unexpectedly." });
+                } finally {
+                  setTestingWebsiteLeads(false);
+                }
+              }}
+            >
+              {testingWebsiteLeads ? <Loader2 className="size-3.5 animate-spin" /> : null}
               Test connection
             </Button>
           </div>

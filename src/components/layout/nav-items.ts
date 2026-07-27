@@ -11,6 +11,7 @@ import {
   MapPinned,
   Camera,
   Palette,
+  Inbox,
 } from "lucide-react";
 
 export interface NavItem {
@@ -30,6 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/scene-builder", label: "Scene Builder", icon: Camera, description: "Compose the exact shot with AI before animating it" },
   { href: "/prompt-builder", label: "Prompt Builder", icon: Wand2, description: "Guided video-motion prompt construction" },
   { href: "/brand-generator", label: "Brand Generator", icon: Palette, description: "Home service company brand kits: mascot, wordmark & background" },
+  { href: "/leads", label: "Leads", icon: Inbox, description: "Every website form submission, in one list" },
   { href: "/history", label: "Generation History", icon: History, description: "Every take, searchable" },
   { href: "/settings", label: "Settings", icon: Settings, description: "Models, defaults & diagnostics" },
 ];

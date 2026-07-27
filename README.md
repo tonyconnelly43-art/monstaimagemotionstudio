@@ -36,6 +36,7 @@ ANTHROPIC_API_KEY=                # Optional — Anthropic Console → API Keys.
 NEXT_PUBLIC_SUPABASE_URL=         # Supabase project → Settings → API
 NEXT_PUBLIC_SUPABASE_ANON_KEY=    # Supabase project → Settings → API
 SUPABASE_SERVICE_ROLE_KEY=        # Supabase project → Settings → API (keep secret!)
+WEBSITE_LEADS_DATABASE_URL=       # Optional — the monsta-media-site marketing website's own Neon DATABASE_URL (a separate project/database). Only needed for the Leads page.
 ```
 
 ### Set up the database

@@ -5,8 +5,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFalClient } from "@/lib/fal/client";
 import { getQueueStatus } from "@/lib/fal/queue";
 import { DEFAULT_VIDEO_MODEL_ID, getVideoModel } from "@/lib/fal/models";
-import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured } from "@/lib/env";
+import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured, isWebsiteLeadsConfigured } from "@/lib/env";
 import { callClaude } from "@/lib/anthropic/client";
+import { neon } from "@neondatabase/serverless";
 import type { Database } from "@/types/database";
 
 async function requireUser() {
@@ -78,5 +79,18 @@ export async function testAnthropicConnectionAction(): Promise<ConnectionTestRes
     return { ok: true, message: text.trim() ? "Claude API responded — connection looks good." : "Claude responded with an empty message." };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Could not reach the Claude API." };
+  }
+}
+
+export async function testWebsiteLeadsConnectionAction(): Promise<ConnectionTestResult> {
+  if (!isWebsiteLeadsConfigured()) {
+    return { ok: false, message: "WEBSITE_LEADS_DATABASE_URL is not set in this environment." };
+  }
+  try {
+    const sql = neon(process.env.WEBSITE_LEADS_DATABASE_URL!);
+    await sql`SELECT 1`;
+    return { ok: true, message: "Connected to the website's leads database." };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Could not reach the website's leads database." };
   }
 }
