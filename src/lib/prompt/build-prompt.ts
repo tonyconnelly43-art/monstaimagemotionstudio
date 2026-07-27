@@ -27,7 +27,7 @@ const CHARACTER_LOCK_STRENGTH_TEXT: Record<ConsistencyStrength, string> = {
     "Preserve each character's exact established design with zero deviation. Use only the most minimal motion needed to convey the action; never redesign, restyle, age, or replace the character.",
 };
 
-const SCENE_LOCK_STRENGTH_TEXT: Record<ConsistencyStrength, string> = {
+export const SCENE_LOCK_STRENGTH_TEXT: Record<ConsistencyStrength, string> = {
   flexible: "Keep the environment recognizable, allowing minor incidental variation.",
   balanced: "Preserve the approved environment design and keep major objects in their established places.",
   strong: "Preserve the exact approved environment layout, objects, and color palette. Do not redesign the background.",

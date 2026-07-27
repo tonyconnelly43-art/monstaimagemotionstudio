@@ -5,7 +5,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getVideoModel, DEFAULT_VIDEO_MODEL_ID } from "@/lib/fal/models";
 import { buildSeedanceInput } from "@/lib/fal/adapters/seedance";
 import { submitToQueue, explainFalError } from "@/lib/fal/queue";
-import { buildFinalPrompt, type CharacterForPrompt, type SceneLocationForPrompt } from "@/lib/prompt/build-prompt";
+import {
+  buildFinalPrompt,
+  SCENE_LOCK_STRENGTH_TEXT,
+  type CharacterForPrompt,
+  type SceneLocationForPrompt,
+} from "@/lib/prompt/build-prompt";
 import { EMPTY_PROMPT_SECTIONS, DEFAULT_BASKETBALL_NEGATIVES, type PromptSections } from "@/lib/prompt/types";
 import { estimateVideoCost } from "@/lib/pricing/config";
 import { generationRequestSchema, GENERATION_RATE_LIMIT } from "@/lib/validation/generation";
@@ -37,6 +42,16 @@ function characterIdentityGuard(characters: CharacterForPrompt[], strength: Cons
         ? "This is very important: "
         : "";
   return `${emphasis}There are exactly ${characters.length} named characters in this scene: ${names}. Keep each one visually distinct and consistent with their own established design for the entire clip — never duplicate a character into two copies of themselves, never let one character's face or body morph into another character's appearance during a hand-off or pass, and never invent extra unnamed characters beyond who's listed here.`;
+}
+
+/**
+ * Same story as Character Lock: Scene Lock Strength only affected the Guided
+ * Builder's prompt text and did nothing for AI Cinematic Script scenes, even
+ * though it exists specifically to stop the environment (court markings,
+ * bleachers, scoreboard, etc.) from drifting between shots.
+ */
+function sceneLockGuard(strength: ConsistencyStrength | null): string {
+  return `Scene Lock (${strength ?? "balanced"}): ${SCENE_LOCK_STRENGTH_TEXT[strength ?? "balanced"]}`;
 }
 
 export async function submitGenerationAction(sceneIdInput: string): Promise<SubmitGenerationResult> {
@@ -161,6 +176,9 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
     // shot list (style, characters, and location are all folded in when it's
     // written) — the guided builder's template assembly would be redundant here.
     prompt = scene.ai_written_prompt.trim();
+    if (scene.scene_lock) {
+      prompt = `${prompt}\n\n${sceneLockGuard(scene.scene_lock_strength)}`;
+    }
     const hoopTarget = (scene.hoop_target as Record<string, string>) ?? {};
     // The Guided Builder path adds these automatically via buildFinalPrompt;
     // AI Cinematic Script scenes were silently skipping them entirely, even
