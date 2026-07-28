@@ -26,7 +26,10 @@ export interface VectorLayers {
 // flood-filling from the image border to find what's NOT reachable (i.e.
 // enclosed by the outline) correctly recovered the interior as solid fill.
 const SHADING_THRESHOLDS = [195, 140, 80];
-const BAND_COLORS = ["#f4e9d8", "#e2b04a", "#8a5a2b", "#241a12"];
+// Grayscale by default so every freshly vectorized design starts out black
+// and white — the user then picks the actual brand colors themselves via
+// the per-layer color pickers, rather than starting from an arbitrary tint.
+const BAND_COLORS = ["#f0f0f0", "#bfbfbf", "#6b6b6b", "#1a1a1a"];
 const INK_LUMINANCE_THRESHOLD = 100;
 
 // The silhouette mask is a clean binary image we generate ourselves, so a
