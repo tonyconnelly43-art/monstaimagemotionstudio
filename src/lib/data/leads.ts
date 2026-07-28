@@ -1,5 +1,6 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
+import { getWebsiteLeadsDatabaseUrl } from "@/lib/env";
 
 export interface WebsiteLead {
   id: number;
@@ -16,19 +17,18 @@ export interface WebsiteLead {
 
 export interface WebsiteLeadsResult {
   leads: WebsiteLead[];
-  /** True when WEBSITE_LEADS_DATABASE_URL isn't set at all — distinct from "zero leads yet". */
+  /** True when no leads database URL is available at all — distinct from "zero leads yet". */
   notConfigured: boolean;
   error: string | null;
 }
 
 /**
  * Reads directly from the monsta-media-site marketing website's own Neon
- * database — a separate project/database from this app's own Supabase
- * instance. That site's `app/api/quote/route.ts` is what actually writes to
+ * database. That site's `app/api/quote/route.ts` is what actually writes to
  * the `leads` table; this is read-only.
  */
 export async function listWebsiteLeads(): Promise<WebsiteLeadsResult> {
-  const dbUrl = process.env.WEBSITE_LEADS_DATABASE_URL;
+  const dbUrl = getWebsiteLeadsDatabaseUrl();
   if (!dbUrl) {
     return { leads: [], notConfigured: true, error: null };
   }

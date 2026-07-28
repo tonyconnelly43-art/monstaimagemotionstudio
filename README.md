@@ -36,7 +36,7 @@ ANTHROPIC_API_KEY=                # Optional — Anthropic Console → API Keys.
 NEXT_PUBLIC_SUPABASE_URL=         # Supabase project → Settings → API
 NEXT_PUBLIC_SUPABASE_ANON_KEY=    # Supabase project → Settings → API
 SUPABASE_SERVICE_ROLE_KEY=        # Supabase project → Settings → API (keep secret!)
-WEBSITE_LEADS_DATABASE_URL=       # Optional — the monsta-media-site marketing website's own Neon DATABASE_URL (a separate project/database). Only needed for the Leads page.
+WEBSITE_LEADS_DATABASE_URL=       # Optional — the monsta-media-site marketing website's own Neon database URL, only needed for the Leads page. Not needed if that same Neon database is connected to this Vercel project directly (Storage tab) — Vercel's own DATABASE_URL is picked up automatically in that case.
 ```
 
 ### Set up the database

@@ -43,9 +43,20 @@ export function isAnthropicConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
+/**
+ * The website's leads live in a Neon Postgres database. Normally that's a
+ * separate database from this app's own Supabase instance, reached via the
+ * explicit WEBSITE_LEADS_DATABASE_URL override — but if this Vercel project
+ * has that same Neon database connected directly (Storage tab), Vercel
+ * already injects it as DATABASE_URL, so fall back to that.
+ */
+export function getWebsiteLeadsDatabaseUrl(): string | undefined {
+  return process.env.WEBSITE_LEADS_DATABASE_URL || process.env.DATABASE_URL;
+}
+
 /** Optional — only needed for the Leads page, which reads the marketing site's own Neon database. */
 export function isWebsiteLeadsConfigured(): boolean {
-  return Boolean(process.env.WEBSITE_LEADS_DATABASE_URL);
+  return Boolean(getWebsiteLeadsDatabaseUrl());
 }
 
 export function isSupabaseConfigured(): boolean {

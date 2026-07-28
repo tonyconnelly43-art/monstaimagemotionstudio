@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFalClient } from "@/lib/fal/client";
 import { getQueueStatus } from "@/lib/fal/queue";
 import { DEFAULT_VIDEO_MODEL_ID, getVideoModel } from "@/lib/fal/models";
-import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured, isWebsiteLeadsConfigured } from "@/lib/env";
+import { isFalConfigured, isSupabaseConfigured, isAnthropicConfigured, isWebsiteLeadsConfigured, getWebsiteLeadsDatabaseUrl } from "@/lib/env";
 import { callClaude } from "@/lib/anthropic/client";
 import { neon } from "@neondatabase/serverless";
 import type { Database } from "@/types/database";
@@ -83,11 +83,12 @@ export async function testAnthropicConnectionAction(): Promise<ConnectionTestRes
 }
 
 export async function testWebsiteLeadsConnectionAction(): Promise<ConnectionTestResult> {
-  if (!isWebsiteLeadsConfigured()) {
-    return { ok: false, message: "WEBSITE_LEADS_DATABASE_URL is not set in this environment." };
+  const dbUrl = getWebsiteLeadsDatabaseUrl();
+  if (!isWebsiteLeadsConfigured() || !dbUrl) {
+    return { ok: false, message: "No leads database URL is set in this environment (WEBSITE_LEADS_DATABASE_URL or DATABASE_URL)." };
   }
   try {
-    const sql = neon(process.env.WEBSITE_LEADS_DATABASE_URL!);
+    const sql = neon(dbUrl);
     await sql`SELECT 1`;
     return { ok: true, message: "Connected to the website's leads database." };
   } catch (err) {
