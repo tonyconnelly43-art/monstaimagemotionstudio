@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/shared/page-header";
 import { LeadsTable } from "@/components/leads/leads-table";
+import { SampleLeadsControls } from "@/components/leads/sample-leads-controls";
 import { listWebsiteLeads } from "@/lib/data/leads";
 
 // Must query the website's live Neon database on every request — otherwise
@@ -27,13 +28,19 @@ export default async function LeadsPage() {
             </p>
           </div>
         ) : leads.length === 0 ? (
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-6">
-            <p className="text-sm text-muted-foreground">
-              {error ?? "No leads yet — they'll show up here as soon as someone submits the website's form."}
-            </p>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-6">
+              <p className="text-sm text-muted-foreground">
+                {error ?? "No leads yet — they'll show up here as soon as someone submits the website's form."}
+              </p>
+            </div>
+            <SampleLeadsControls hasLeads={false} />
           </div>
         ) : (
-          <LeadsTable leads={leads} />
+          <div className="space-y-3">
+            <SampleLeadsControls hasLeads={true} />
+            <LeadsTable leads={leads} />
+          </div>
         )}
       </div>
     </div>
