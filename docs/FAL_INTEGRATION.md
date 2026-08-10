@@ -26,6 +26,8 @@ version, or adding a new one, is a change in one file.
 | Seedance 2 Fast — Image to Video | `bytedance/seedance-2.0/fast/image-to-video` | 2026-07-10 |
 | Seedance 2 — Reference to Video | `bytedance/seedance-2.0/reference-to-video` | 2026-07-10 |
 | ElevenLabs Eleven v3 (TTS) | `fal-ai/elevenlabs/tts/eleven-v3` | 2026-07-10 |
+| ElevenLabs Voice Design (preview) | `fal-ai/elevenlabs/text-to-voice/design/eleven-v3` | 2026-08-10 |
+| ElevenLabs Voice Design (save) | `fal-ai/elevenlabs/text-to-voice/create` | 2026-08-10 |
 | Sync Lipsync 2.0 | `fal-ai/sync-lipsync/v2` | 2026-07-10 |
 
 Models listed in `VOICE_MODELS` with `isWired: false` (Dia TTS, F5-TTS, Qwen Voice Cloning, Gemini
