@@ -48,7 +48,8 @@ export interface BuildPromptInput {
   characterLockStrength: ConsistencyStrength;
   sceneLock: boolean;
   sceneLockStrength: ConsistencyStrength;
-  hoopSquadStyleInstructions: string;
+  /** The project's own style profile — not global, so different shows on the same account never bleed into each other. */
+  styleInstructions: string;
   globalNegativePrompt: string;
   /** "basketball" = active game action; "everyday" = hangout/story moments outside the game. */
   sceneStyleMode: "basketball" | "everyday";
@@ -70,7 +71,7 @@ function joinNonEmpty(parts: Array<string | null | undefined>, sep = " "): strin
 export function buildFinalPrompt(input: BuildPromptInput): { prompt: string; negativePrompt: string } {
   const promptParts: string[] = [];
 
-  promptParts.push(input.hoopSquadStyleInstructions);
+  promptParts.push(input.styleInstructions);
   promptParts.push(
     input.sceneStyleMode === "basketball" ? input.basketballStyleInstructions : input.everydayStyleInstructions,
   );

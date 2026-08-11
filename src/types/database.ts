@@ -35,6 +35,9 @@ export interface Database {
           target_platform: string | null;
           is_demo: boolean;
           metadata: Json;
+          style_instructions: string | null;
+          basketball_style_instructions: string | null;
+          everyday_style_instructions: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -443,10 +446,7 @@ export interface Database {
           default_voice_model_id: string | null;
           default_aspect_ratio: string;
           default_output_quality: string;
-          hoop_squad_style_instructions: string;
           global_negative_prompt: string;
-          basketball_style_instructions: string;
-          everyday_style_instructions: string;
           spending_warning_threshold: number | null;
           daily_spending_limit: number | null;
           auto_save: boolean;

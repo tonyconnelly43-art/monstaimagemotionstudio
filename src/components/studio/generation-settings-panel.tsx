@@ -138,7 +138,7 @@ export function GenerationSettingsPanel({
           {scene.style_mode === "basketball"
             ? "Game moments get moodier lighting, cinematic camera work, and heroic framing."
             : "Hangout & story moments get bright, playful Saturday-morning-cartoon energy."}{" "}
-          Edit the exact wording in Settings.
+          Edit the exact wording from this project&apos;s Style Profile button, above the scene list.
         </p>
       </div>
 

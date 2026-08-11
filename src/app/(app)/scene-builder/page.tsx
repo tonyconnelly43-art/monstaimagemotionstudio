@@ -5,7 +5,6 @@ import { listProjects } from "@/lib/data/projects";
 import { listAllScenesForUser, getCurrentStartingFrame } from "@/lib/data/scenes";
 import { listCharacters, listAllCharacterReferences } from "@/lib/data/characters";
 import { listHoopSquadScenes, listAllSceneReferences } from "@/lib/data/hoop-squad-scenes";
-import { getAppSettings } from "@/lib/data/settings";
 
 export default async function SceneBuilderPage({
   searchParams,
@@ -14,18 +13,14 @@ export default async function SceneBuilderPage({
 }) {
   const { project: initialProjectId, scene: initialSceneId } = await searchParams;
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const [projects, scenes, characters, characterReferences, locations, sceneReferences, settings] = await Promise.all([
+  const [projects, scenes, characters, characterReferences, locations, sceneReferences] = await Promise.all([
     listProjects(supabase),
     listAllScenesForUser(supabase),
     listCharacters(supabase),
     listAllCharacterReferences(supabase),
     listHoopSquadScenes(supabase),
     listAllSceneReferences(supabase),
-    user ? getAppSettings(supabase, user.id) : Promise.resolve(null),
   ]);
 
   const effectiveProjectId =
@@ -48,7 +43,6 @@ export default async function SceneBuilderPage({
         characterReferences={characterReferences}
         locations={locations}
         sceneReferences={sceneReferences}
-        settings={settings}
         initialProjectId={effectiveProjectId}
         initialSceneId={effectiveSceneId}
         currentStartingFrameUrl={currentStartingFrameUrl}

@@ -8,7 +8,6 @@ import type { Project } from "@/lib/data/projects";
 import type { Scene } from "@/lib/data/scenes";
 import type { CharacterRow, CharacterReference } from "@/lib/data/characters";
 import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
-import type { AppSettings } from "@/lib/data/settings";
 
 export function SceneBuilderWorkspace({
   projects,
@@ -17,7 +16,6 @@ export function SceneBuilderWorkspace({
   characterReferences,
   locations,
   sceneReferences,
-  settings,
   initialProjectId,
   initialSceneId,
   currentStartingFrameUrl,
@@ -28,7 +26,6 @@ export function SceneBuilderWorkspace({
   characterReferences: CharacterReference[];
   locations: HoopSquadScene[];
   sceneReferences: SceneReference[];
-  settings: AppSettings | null;
   initialProjectId: string;
   initialSceneId: string;
   currentStartingFrameUrl: string | null;
@@ -38,6 +35,7 @@ export function SceneBuilderWorkspace({
   const projectScenes = scenes.filter((s) => s.project_id === projectId);
   const sceneId = initialSceneId;
   const scene = scenes.find((s) => s.id === sceneId) ?? null;
+  const project = projects.find((p) => p.id === projectId) ?? null;
 
   function goTo(nextProjectId: string, nextSceneId: string) {
     router.push(`/scene-builder?project=${nextProjectId}&scene=${nextSceneId}`);
@@ -98,7 +96,7 @@ export function SceneBuilderWorkspace({
           characterReferences={characterReferences}
           locations={locations}
           sceneReferences={sceneReferences}
-          settings={settings}
+          project={project}
           currentStartingFrameUrl={currentStartingFrameUrl}
         />
       ) : (

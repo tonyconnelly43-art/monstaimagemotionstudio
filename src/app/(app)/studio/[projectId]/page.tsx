@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { StudioWorkspace } from "@/components/studio/studio-workspace";
+import { ProjectStyleDialog } from "@/components/studio/project-style-dialog";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getProject, PROJECT_TYPES } from "@/lib/data/projects";
 import { listScenes, listSceneAssets, listSceneTakes, getActiveGenerationJob } from "@/lib/data/scenes";
@@ -46,7 +47,10 @@ export default async function StudioProjectPage({
         title={project.name}
         description="Upload artwork, choose characters, describe the action, and generate."
         action={
-          <Badge variant="secondary">{PROJECT_TYPES.find((t) => t.value === project.project_type)?.label}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">{PROJECT_TYPES.find((t) => t.value === project.project_type)?.label}</Badge>
+            <ProjectStyleDialog project={project} />
+          </div>
         }
       />
       <StudioWorkspace

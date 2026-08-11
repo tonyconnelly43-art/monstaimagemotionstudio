@@ -23,7 +23,8 @@ export interface CharacterPlacementInput {
 }
 
 export interface BuildScenePromptInput {
-  hoopSquadStyleInstructions: string;
+  /** The project's own style profile — not global, so different shows never bleed into each other. */
+  styleInstructions: string;
   locationName: string | null;
   placements: CharacterPlacementInput[];
   threePointPosition: ThreePointPosition;
@@ -42,7 +43,7 @@ export interface BuildScenePromptInput {
 export function buildScenePrompt(input: BuildScenePromptInput): string {
   const parts: string[] = [];
 
-  if (input.hoopSquadStyleInstructions.trim()) parts.push(input.hoopSquadStyleInstructions.trim());
+  if (input.styleInstructions.trim()) parts.push(input.styleInstructions.trim());
 
   if (input.locationName) {
     parts.push(

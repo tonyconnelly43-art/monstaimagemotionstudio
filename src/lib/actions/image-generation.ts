@@ -200,14 +200,14 @@ export async function generateSceneCompositionAction(
     const { supabase, user } = await requireUser();
     const characterIds = placements.map((p) => p.characterId);
 
-    const [{ data: characters }, { data: settings }, { data: location }] = await Promise.all([
+    const [{ data: characters }, { data: project }, { data: location }] = await Promise.all([
       characterIds.length
         ? supabase
             .from("characters")
             .select("id, name, main_image_url, front_view_url, side_view_url, back_view_url")
             .in("id", characterIds)
         : Promise.resolve({ data: [] }),
-      supabase.from("app_settings").select("hoop_squad_style_instructions").eq("user_id", user.id).maybeSingle(),
+      supabase.from("projects").select("style_instructions").eq("id", projectId).maybeSingle(),
       hoopSquadSceneId
         ? supabase.from("hoop_squad_scenes").select("name").eq("id", hoopSquadSceneId).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -226,7 +226,7 @@ export async function generateSceneCompositionAction(
     referenceImageUrls.push(...locationImageUrls);
 
     const fullPrompt = buildScenePrompt({
-      hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
+      styleInstructions: project?.style_instructions ?? "",
       locationName: location?.name ?? null,
       placements: placementInputs,
       threePointPosition,

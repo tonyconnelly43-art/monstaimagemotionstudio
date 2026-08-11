@@ -34,6 +34,7 @@ export function PromptBuilderWorkspace({
   settings: AppSettings | null;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
+  const project = projects.find((p) => p.id === projectId) ?? null;
   const projectScenes = scenes.filter((s) => s.project_id === projectId);
   const [sceneId, setSceneId] = useState(projectScenes[0]?.id ?? "");
   const scene = scenes.find((s) => s.id === sceneId) ?? projectScenes[0] ?? null;
@@ -69,11 +70,11 @@ export function PromptBuilderWorkspace({
         characterLockStrength: scene.character_lock_strength,
         sceneLock: scene.scene_lock,
         sceneLockStrength: scene.scene_lock_strength,
-        hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
+        styleInstructions: project?.style_instructions ?? "",
         globalNegativePrompt: settings?.global_negative_prompt ?? "",
         sceneStyleMode: scene.style_mode,
-        basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
-        everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
+        basketballStyleInstructions: project?.basketball_style_instructions ?? "",
+        everydayStyleInstructions: project?.everyday_style_instructions ?? "",
       })
     : null;
 

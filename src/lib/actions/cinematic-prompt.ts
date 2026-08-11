@@ -51,12 +51,12 @@ export async function writeCinematicPromptAction(
     if (!process.env.ANTHROPIC_API_KEY) {
       return { error: "Add ANTHROPIC_API_KEY in your environment variables first (Settings shows connection status)." };
     }
-    const { supabase, user } = await requireUser();
+    const { supabase } = await requireUser();
 
     const { data: scene, error: sceneError } = await supabase.from("scenes").select("*").eq("id", sceneId).single();
     if (sceneError || !scene) return { error: "Scene not found." };
 
-    const [{ data: characters }, { data: location }, dialogueLines, { data: settings }] = await Promise.all([
+    const [{ data: characters }, { data: location }, dialogueLines, { data: project }] = await Promise.all([
       scene.character_ids?.length
         ? supabase
             .from("characters")
@@ -71,15 +71,17 @@ export async function writeCinematicPromptAction(
             .maybeSingle()
         : Promise.resolve({ data: null }),
       listDialogueLines(supabase, sceneId),
+      // Style profile lives on the project, not the account — each show/brand
+      // keeps its own illustration style instead of one bleeding into another.
       supabase
-        .from("app_settings")
-        .select("hoop_squad_style_instructions, basketball_style_instructions, everyday_style_instructions")
-        .eq("user_id", user.id)
+        .from("projects")
+        .select("style_instructions, basketball_style_instructions, everyday_style_instructions")
+        .eq("id", scene.project_id)
         .maybeSingle(),
     ]);
 
     const styleForMode =
-      scene.style_mode === "basketball" ? settings?.basketball_style_instructions : settings?.everyday_style_instructions;
+      scene.style_mode === "basketball" ? project?.basketball_style_instructions : project?.everyday_style_instructions;
 
     const characterLines = (characters ?? [])
       .map((c) => {
@@ -122,7 +124,7 @@ export async function writeCinematicPromptAction(
       .join(". ");
 
     const userPrompt = `Total clip duration: ${scene.duration_seconds} seconds.
-Animation style: ${settings?.hoop_squad_style_instructions ?? ""} ${styleForMode ?? ""}
+Animation style: ${project?.style_instructions ?? ""} ${styleForMode ?? ""}
 Characters in this shot: ${characterLines || "none specified"}.
 Location: ${location?.name ?? "unspecified"} — ${location?.environment_description ?? ""}
 Time of day: ${scene.time_of_day ?? "unspecified — pick something that fits the scene idea"}

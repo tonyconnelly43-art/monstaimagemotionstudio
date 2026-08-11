@@ -168,6 +168,14 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
   }
 
   const { data: settings } = await supabase.from("app_settings").select("*").eq("user_id", user.id).maybeSingle();
+  // Style profile lives on the project, not the account — each show/brand
+  // keeps its own illustration style instead of one cartoon's style
+  // bleeding into every other project on the account.
+  const { data: project } = await supabase
+    .from("projects")
+    .select("style_instructions, basketball_style_instructions, everyday_style_instructions")
+    .eq("id", scene.project_id)
+    .maybeSingle();
 
   let prompt: string;
   let negativePrompt: string;
@@ -201,12 +209,11 @@ export async function submitGenerationAction(sceneIdInput: string): Promise<Subm
       characterLockStrength: scene.character_lock_strength,
       sceneLock: scene.scene_lock,
       sceneLockStrength: scene.scene_lock_strength,
-      hoopSquadStyleInstructions:
-        settings?.hoop_squad_style_instructions ?? "Preserve the exact approved Hoop Squad cartoon illustration style.",
+      styleInstructions: project?.style_instructions ?? "",
       globalNegativePrompt: settings?.global_negative_prompt ?? "",
       sceneStyleMode: scene.style_mode,
-      basketballStyleInstructions: settings?.basketball_style_instructions ?? "",
-      everydayStyleInstructions: settings?.everyday_style_instructions ?? "",
+      basketballStyleInstructions: project?.basketball_style_instructions ?? "",
+      everydayStyleInstructions: project?.everyday_style_instructions ?? "",
     }));
   }
 

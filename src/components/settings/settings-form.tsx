@@ -136,52 +136,20 @@ export function SettingsForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Hoop Squad Global Style Profile</CardTitle>
-          <CardDescription>Automatically added to every generated prompt.</CardDescription>
+          <CardTitle>Global Negative Prompt</CardTitle>
+          <CardDescription>
+            Automatically added to every generated prompt across every project. Each project keeps its own art-style
+            profile now — open a project in Studio and click &ldquo;Style Profile&rdquo; to edit that project&apos;s
+            style instead.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Style instructions</Label>
-            <Textarea
-              defaultValue={settings.hoop_squad_style_instructions}
-              onBlur={(e) => patch({ hoop_squad_style_instructions: e.target.value })}
-              rows={4}
-            />
-          </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Global negative prompt</Label>
             <Textarea
               defaultValue={settings.global_negative_prompt}
               onBlur={(e) => patch({ global_negative_prompt: e.target.value })}
               rows={4}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Scene Style Rules</CardTitle>
-          <CardDescription>
-            Automatically applied on top of the Hoop Squad style profile, based on each scene&apos;s Basketball / Everyday
-            setting in Studio.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Basketball scenes (cinematic, Batman/Marvel-style)</Label>
-            <Textarea
-              defaultValue={settings.basketball_style_instructions}
-              onBlur={(e) => patch({ basketball_style_instructions: e.target.value })}
-              rows={5}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Everyday scenes (Saturday-morning cartoon)</Label>
-            <Textarea
-              defaultValue={settings.everyday_style_instructions}
-              onBlur={(e) => patch({ everyday_style_instructions: e.target.value })}
-              rows={5}
             />
           </div>
         </CardContent>

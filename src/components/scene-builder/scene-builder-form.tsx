@@ -18,7 +18,7 @@ import { characterLibraryImages, locationLibraryImages } from "@/lib/reference-i
 import type { Scene } from "@/lib/data/scenes";
 import type { CharacterRow, CharacterReference } from "@/lib/data/characters";
 import type { HoopSquadScene, SceneReference } from "@/lib/data/hoop-squad-scenes";
-import type { AppSettings } from "@/lib/data/settings";
+import type { Project } from "@/lib/data/projects";
 
 export function SceneBuilderForm({
   scene,
@@ -27,7 +27,7 @@ export function SceneBuilderForm({
   characterReferences,
   locations,
   sceneReferences,
-  settings,
+  project,
   currentStartingFrameUrl,
 }: {
   scene: Scene;
@@ -36,7 +36,7 @@ export function SceneBuilderForm({
   characterReferences: CharacterReference[];
   locations: HoopSquadScene[];
   sceneReferences: SceneReference[];
-  settings: AppSettings | null;
+  project: Project | null;
   currentStartingFrameUrl: string | null;
 }) {
   const router = useRouter();
@@ -96,7 +96,7 @@ export function SceneBuilderForm({
   const locationImages = location ? locationLibraryImages(location, sceneReferences) : [];
 
   const previewPrompt = buildScenePrompt({
-    hoopSquadStyleInstructions: settings?.hoop_squad_style_instructions ?? "",
+    styleInstructions: project?.style_instructions ?? "",
     locationName: location?.name ?? null,
     placements: selectedCharacters.map((c) => ({ name: c.name, position: positions[c.id] ?? "" })),
     threePointPosition,

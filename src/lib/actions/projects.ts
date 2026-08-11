@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PROJECT_TYPES } from "@/lib/data/projects";
+import type { Database } from "@/types/database";
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Name your project.").max(120),
@@ -70,6 +71,9 @@ export async function duplicateProjectAction(projectId: string) {
       description: source.description,
       target_aspect_ratio: source.target_aspect_ratio,
       target_platform: source.target_platform,
+      style_instructions: source.style_instructions,
+      basketball_style_instructions: source.basketball_style_instructions,
+      everyday_style_instructions: source.everyday_style_instructions,
     })
     .select("id")
     .single();
@@ -87,6 +91,18 @@ export async function duplicateProjectAction(projectId: string) {
 
   revalidatePath("/projects");
   revalidatePath("/studio");
+}
+
+export async function updateProjectAction(
+  projectId: string,
+  patch: Partial<Database["public"]["Tables"]["projects"]["Update"]>,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("projects").update(patch).eq("id", projectId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/studio/${projectId}`);
+  revalidatePath("/prompt-builder");
+  revalidatePath("/scene-builder");
 }
 
 export async function archiveProjectAction(projectId: string) {
