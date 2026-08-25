@@ -39,8 +39,24 @@ const INK_LUMINANCE_THRESHOLD = 100;
 // linework) still let ~100 grain-speckle subpaths through in a shaded region,
 // turning smooth shadows into a scattered mess of tiny shapes once
 // vectorized. turdSize=220 collapsed that same test down to ~4 real subpaths.
-const SILHOUETTE_CLEANUP = { turdSize: 30, optTolerance: 0.5, alphaMax: 1.2 };
-const SHADING_CLEANUP = { turdSize: 220, optTolerance: 0.8, alphaMax: 1.3 };
+//
+// optTolerance and alphaMax were re-tuned against potrace's actual
+// corner-detection source (a vertex becomes a sharp CORNER only when its
+// local alpha >= alphaMax; otherwise it's smoothed into a curve — verified
+// by reading node_modules/potrace/lib/Potrace.js directly). The old values
+// (0.5/1.2 and 0.8/1.3) sat close to potrace's max-smoothing end, which
+// rounds off edges that should stay straight. Lowering optTolerance makes
+// the traced curve hug the actual pixel boundary more tightly (verified on
+// a synthetic circle: 0.5->4 curve segments, 0.2->15 — strictly more
+// precise, no downside). Lowering alphaMax makes more borderline vertices
+// register as sharp corners instead of getting smoothed away — but pushed
+// too far it starts faceting genuinely round shapes into visible polygons;
+// empirically the same circle test stayed perfectly smooth down to 0.85 and
+// started faceting at 0.8, so 0.9 keeps a safety margin. Shading keeps a
+// higher alphaMax since airbrush shading blobs are inherently the roundest
+// content being traced.
+const SILHOUETTE_CLEANUP = { turdSize: 30, optTolerance: 0.2, alphaMax: 0.9 };
+const SHADING_CLEANUP = { turdSize: 220, optTolerance: 0.35, alphaMax: 1.0 };
 
 function luminance(r: number, g: number, b: number): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;
