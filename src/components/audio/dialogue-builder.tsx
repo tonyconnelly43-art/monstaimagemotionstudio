@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, Play, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -195,7 +195,17 @@ function LineGenerateButton({ line }: { line: DialogueLine }) {
         Generate Line
       </Button>
       {line.audio_url ? (
-        <audio src={line.audio_url} controls className="h-7 w-40" />
+        <>
+          <audio src={line.audio_url} controls className="h-7 w-40" />
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            title="Download this line's audio"
+            render={<a href={line.audio_url} download={`dialogue-line-${line.id}.mp3`} />}
+          >
+            <Download className="size-3.5" />
+          </Button>
+        </>
       ) : null}
     </div>
   );

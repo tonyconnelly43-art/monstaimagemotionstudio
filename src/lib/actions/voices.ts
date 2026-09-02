@@ -45,6 +45,24 @@ export async function deleteVoiceAction(voiceId: string) {
   revalidatePath("/voices");
 }
 
+/**
+ * Assigns a voice to a character from the character's own page — clears any
+ * other voice currently pointing at this character first, so generation
+ * (which looks up a character's voice by character_id) never finds more
+ * than one match.
+ */
+export async function assignCharacterVoiceAction(characterId: string, voiceId: string | null) {
+  const { supabase } = await requireUser();
+  const { error: clearError } = await supabase.from("voices").update({ character_id: null }).eq("character_id", characterId);
+  if (clearError) throw new Error(clearError.message);
+  if (voiceId) {
+    const { error } = await supabase.from("voices").update({ character_id: characterId }).eq("id", voiceId);
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/voices");
+  revalidatePath(`/characters/${characterId}`);
+}
+
 export async function confirmVoiceCloneConsentAction(voiceId: string, referenceAudioUrl: string) {
   const { supabase } = await requireUser();
   const { error } = await supabase

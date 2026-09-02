@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCharacter, listCharacterReferences } from "@/lib/data/characters";
+import { listVoices } from "@/lib/data/audio";
 import { CharacterEditor } from "@/components/characters/character-editor";
 
 export default async function CharacterDetailPage({ params }: { params: Promise<{ characterId: string }> }) {
@@ -8,7 +9,10 @@ export default async function CharacterDetailPage({ params }: { params: Promise<
   const supabase = await createServerSupabaseClient();
   const character = await getCharacter(supabase, characterId);
   if (!character) notFound();
-  const references = await listCharacterReferences(supabase, characterId);
+  const [references, voices] = await Promise.all([
+    listCharacterReferences(supabase, characterId),
+    listVoices(supabase),
+  ]);
 
-  return <CharacterEditor character={character} references={references} />;
+  return <CharacterEditor character={character} references={references} voices={voices} />;
 }

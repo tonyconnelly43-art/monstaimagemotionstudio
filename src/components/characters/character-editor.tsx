@@ -9,13 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
 import { ImageSlotUpload } from "@/components/shared/image-slot-upload";
 import { GenerateReferenceDialog } from "@/components/shared/generate-reference-dialog";
 import { ImageLightboxButton } from "@/components/shared/image-lightbox-button";
 import { updateCharacterAction, deleteCharacterAction, deleteCharacterReferenceAction } from "@/lib/actions/characters";
+import { assignCharacterVoiceAction } from "@/lib/actions/voices";
 import { uploadCharacterProfileImage, uploadCharacterReference } from "@/lib/supabase/upload";
 import { generateCharacterReferenceAction } from "@/lib/actions/image-generation";
 import { CHARACTER_REFERENCE_TYPES, type CharacterReference, type CharacterRow } from "@/lib/data/characters";
+import type { Voice } from "@/lib/data/audio";
 
 const TEXT_FIELDS: { key: keyof CharacterRow; label: string; multiline?: boolean }[] = [
   { key: "description", label: "Character Description", multiline: true },
@@ -34,12 +38,15 @@ const TEXT_FIELDS: { key: keyof CharacterRow; label: string; multiline?: boolean
 export function CharacterEditor({
   character,
   references,
+  voices,
 }: {
   character: CharacterRow;
   references: CharacterReference[];
+  voices: Voice[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const assignedVoice = voices.find((v) => v.character_id === character.id);
 
   function patch(update: Partial<CharacterRow>) {
     startTransition(async () => {
@@ -47,6 +54,18 @@ export function CharacterEditor({
         await updateCharacterAction(character.id, update as never);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Could not save.");
+      }
+    });
+  }
+
+  function handleVoiceChange(voiceId: string) {
+    startTransition(async () => {
+      try {
+        await assignCharacterVoiceAction(character.id, voiceId === "none" ? null : voiceId);
+        toast.success(voiceId === "none" ? "Voice unassigned." : "Voice assigned.");
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not assign voice.");
       }
     });
   }
@@ -95,6 +114,32 @@ export function CharacterEditor({
           url={character.back_view_url}
           onUpload={(file) => uploadCharacterProfileImage(character.id, "back_view_url", file).then(() => router.refresh())}
         />
+      </div>
+
+      <div className="space-y-1.5 rounded-lg border border-border/60 p-3">
+        <Label className="text-xs text-muted-foreground">Voice</Label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={assignedVoice?.id ?? "none"} onValueChange={(v) => v && handleVoiceChange(v)}>
+            <SelectTrigger className="w-64">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No voice assigned</SelectItem>
+              {voices.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Link href="/voices" className="text-xs text-muted-foreground underline underline-offset-2 hover:text-primary">
+            Design or manage voices
+          </Link>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Whichever voice is assigned here auto-attaches as a reference on Reference to Video generations whenever this
+          character is Character Locked, and is what Dialogue Builder uses to generate this character&apos;s lines.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, Play, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
   createVoiceAction,
   deleteVoiceAction,
   updateVoiceAction,
+  assignCharacterVoiceAction,
   generateVoicePreviewAction,
   confirmVoiceCloneConsentAction,
 } from "@/lib/actions/voices";
@@ -81,6 +82,23 @@ function VoiceEditor({ voice, characters }: { voice: Voice; characters: Characte
     });
   }
 
+  function handleCharacterChange(characterId: string) {
+    startTransition(async () => {
+      try {
+        // Routed through assignCharacterVoiceAction (not a plain patch) so any
+        // other voice already pointing at the newly-picked character gets
+        // cleared first — generation only ever expects one voice per character.
+        if (characterId === "none") {
+          await updateVoiceAction(voice.id, { character_id: null } as never);
+        } else {
+          await assignCharacterVoiceAction(characterId, voice.id);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not assign voice.");
+      }
+    });
+  }
+
   async function handlePreview() {
     setGenerating(true);
     setPreviewUrl(null);
@@ -97,7 +115,7 @@ function VoiceEditor({ voice, characters }: { voice: Voice; characters: Characte
           <Label className="text-xs text-muted-foreground">Character</Label>
           <Select
             value={voice.character_id ?? "none"}
-            onValueChange={(v) => v && patch({ character_id: v === "none" ? null : v })}
+            onValueChange={(v) => v && handleCharacterChange(v)}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -197,7 +215,17 @@ function VoiceEditor({ voice, characters }: { voice: Voice; characters: Characte
             Preview Voice
           </Button>
           {previewUrl ? (
-            <audio src={previewUrl} controls className="h-8" />
+            <>
+              <audio src={previewUrl} controls className="h-8" />
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                title="Download this preview"
+                render={<a href={previewUrl} download={`${voice.name.replace(/\s+/g, "-").toLowerCase()}-preview.mp3`} />}
+              >
+                <Download className="size-3.5" />
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
