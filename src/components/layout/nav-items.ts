@@ -24,7 +24,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/studio", label: "Studio", icon: Clapperboard, description: "Build and generate scenes" },
   { href: "/projects", label: "Projects", icon: FolderKanban, description: "All your Hoop Squad projects" },
-  { href: "/hoop-squad", label: "Hoop Squad", icon: MapPinned, description: "Scene & environment library" },
+  { href: "/hoop-squad", label: "Locations", icon: MapPinned, description: "Scene & environment library — every project's locations live here" },
   { href: "/characters", label: "Characters", icon: Users, description: "Character library & consistency" },
   { href: "/voices", label: "Voices", icon: Mic2, description: "Character voice profiles" },
   { href: "/audio", label: "Audio", icon: Music4, description: "Dialogue, music & sound effects" },

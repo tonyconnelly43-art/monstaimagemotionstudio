@@ -16,7 +16,7 @@ export default async function CharactersPage() {
     <div className="flex flex-col">
       <PageHeader
         title="Characters"
-        description="The permanent Hoop Squad character library. Upload approved artwork here once, then reuse it in every scene with Character Lock."
+        description="The permanent character library, shared across every project. Upload approved artwork here once, then reuse it in every scene with Character Lock."
         action={<NewCharacterButton />}
       />
       <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

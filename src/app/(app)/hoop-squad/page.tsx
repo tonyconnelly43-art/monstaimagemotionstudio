@@ -16,8 +16,8 @@ export default async function HoopSquadPage() {
   return (
     <div className="flex flex-col">
       <PageHeader
-        title="Hoop Squad"
-        description="The permanent scene & environment library. Save each approved location once, then reuse it with Scene Lock instead of re-uploading backgrounds."
+        title="Locations"
+        description="The permanent scene & environment library, shared across every project. Save each approved location once, then reuse it with Scene Lock instead of re-uploading backgrounds."
         action={<NewLocationButton />}
       />
       <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
