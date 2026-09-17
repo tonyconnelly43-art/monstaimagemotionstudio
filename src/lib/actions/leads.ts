@@ -15,6 +15,9 @@ const SAMPLE_LEADS = [
     package: "Brand Refresh",
     promo: "FREEBRAND10",
     daysAgo: 2,
+    utmSource: "facebook",
+    utmMedium: "paid-social",
+    utmCampaign: "fall-brand-review-promo",
   },
   {
     name: "James Carter",
@@ -25,6 +28,9 @@ const SAMPLE_LEADS = [
     package: "Full Rebrand",
     promo: null,
     daysAgo: 1,
+    utmSource: null,
+    utmMedium: null,
+    utmCampaign: null,
   },
   {
     name: "Dana Reyes",
@@ -35,6 +41,9 @@ const SAMPLE_LEADS = [
     package: "Logo Only",
     promo: "SPRING2026",
     daysAgo: 0,
+    utmSource: "facebook",
+    utmMedium: "paid-social",
+    utmCampaign: "fall-brand-review-promo",
   },
 ];
 
@@ -61,13 +70,22 @@ export async function seedSampleLeadsAction(): Promise<{ ok: boolean; message: s
         package TEXT,
         promo TEXT,
         source TEXT NOT NULL DEFAULT 'website',
+        utm_source TEXT,
+        utm_medium TEXT,
+        utm_campaign TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `;
+    await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_source TEXT`;
+    await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_medium TEXT`;
+    await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_campaign TEXT`;
     for (const lead of SAMPLE_LEADS) {
       await sql`
-        INSERT INTO leads (name, company, phone, email, message, package, promo, source, created_at)
-        VALUES (${lead.name}, ${lead.company}, ${lead.phone}, ${lead.email}, ${lead.message}, ${lead.package}, ${lead.promo}, 'website', now() - (${lead.daysAgo} || ' days')::interval)
+        INSERT INTO leads (name, company, phone, email, message, package, promo, source, utm_source, utm_medium, utm_campaign, created_at)
+        VALUES (
+          ${lead.name}, ${lead.company}, ${lead.phone}, ${lead.email}, ${lead.message}, ${lead.package}, ${lead.promo}, 'website',
+          ${lead.utmSource}, ${lead.utmMedium}, ${lead.utmCampaign}, now() - (${lead.daysAgo} || ' days')::interval
+        )
       `;
     }
     revalidatePath("/leads");

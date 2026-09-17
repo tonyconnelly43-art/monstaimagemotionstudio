@@ -12,6 +12,9 @@ export interface WebsiteLead {
   package: string | null;
   promo: string | null;
   source: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
   created_at: string;
 }
 
@@ -35,8 +38,17 @@ export async function listWebsiteLeads(): Promise<WebsiteLeadsResult> {
 
   try {
     const sql = neon(dbUrl);
+    // Idempotent, additive, non-destructive — mirrors exactly what the
+    // website's own /api/quote route already runs. Guards against the case
+    // where these columns were added to this file before anyone has
+    // resubmitted the website's form since its own deploy (which is what
+    // actually creates them there); without this, the SELECT below would
+    // throw "column does not exist" until that first new submission.
+    await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_source TEXT`;
+    await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_medium TEXT`;
+    await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_campaign TEXT`;
     const rows = (await sql`
-      SELECT id, name, company, phone, email, message, package, promo, source, created_at
+      SELECT id, name, company, phone, email, message, package, promo, source, utm_source, utm_medium, utm_campaign, created_at
       FROM leads
       ORDER BY created_at DESC
     `) as WebsiteLead[];

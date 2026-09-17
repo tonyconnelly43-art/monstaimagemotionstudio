@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { WebsiteLead } from "@/lib/data/leads";
@@ -38,7 +39,7 @@ export function LeadsTable({ leads }: { leads: WebsiteLead[] }) {
     const q = search.trim().toLowerCase();
     const rows = q
       ? scored.filter(({ lead }) =>
-          [lead.name, lead.company, lead.phone, lead.email, lead.package, lead.promo, lead.message]
+          [lead.name, lead.company, lead.phone, lead.email, lead.package, lead.promo, lead.message, lead.utm_source, lead.utm_campaign]
             .filter(Boolean)
             .some((field) => field!.toLowerCase().includes(q)),
         )
@@ -92,6 +93,7 @@ export function LeadsTable({ leads }: { leads: WebsiteLead[] }) {
         <TableHeader>
           <TableRow>
             <TableHead>Status</TableHead>
+            <TableHead>Source</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Company</TableHead>
@@ -116,6 +118,22 @@ export function LeadsTable({ leads }: { leads: WebsiteLead[] }) {
                     </TooltipTrigger>
                     <TooltipContent>{LEAD_STATUS_DESCRIPTION[status]}</TooltipContent>
                   </Tooltip>
+                </TableCell>
+                <TableCell>
+                  {lead.utm_source ? (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="secondary" className="text-xs font-normal capitalize">
+                          {lead.utm_source}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {[lead.utm_campaign, lead.utm_medium].filter(Boolean).join(" · ") || "No campaign details captured"}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Direct/Organic</span>
+                  )}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                   {format(new Date(lead.created_at), "MMM d, yyyy p")}
