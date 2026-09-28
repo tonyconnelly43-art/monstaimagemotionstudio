@@ -472,6 +472,44 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["generation_rate_limits"]["Row"]>;
         Relationships: [];
       };
+      agency_clients: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          industry: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["agency_clients"]["Row"]> & { user_id: string; name: string };
+        Update: Partial<Database["public"]["Tables"]["agency_clients"]["Row"]>;
+        Relationships: [];
+      };
+      agency_client_metrics: {
+        Row: {
+          id: string;
+          user_id: string;
+          client_id: string;
+          period_label: string;
+          period_start: string;
+          calls: number;
+          conversions: number;
+          avg_ticket: number;
+          extra_metrics: Json;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["agency_client_metrics"]["Row"]> & {
+          user_id: string;
+          client_id: string;
+          period_label: string;
+          period_start: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agency_client_metrics"]["Row"]>;
+        Relationships: [];
+      };
       brand_projects: {
         Row: {
           id: string;

@@ -12,6 +12,7 @@ import {
   Camera,
   Palette,
   Inbox,
+  TrendingUp,
 } from "lucide-react";
 
 export interface NavItem {
@@ -32,6 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/prompt-builder", label: "Prompt Builder", icon: Wand2, description: "Guided video-motion prompt construction" },
   { href: "/brand-generator", label: "Brand Generator", icon: Palette, description: "Home service company brand kits: mascot, wordmark & background" },
   { href: "/leads", label: "Leads", icon: Inbox, description: "Every website form submission, in one list" },
+  { href: "/clients", label: "Client Results", icon: TrendingUp, description: "Track calls, conversions, and close rate per client — with a what-if projection calculator" },
   { href: "/history", label: "Generation History", icon: History, description: "Every take, searchable" },
   { href: "/settings", label: "Settings", icon: Settings, description: "Models, defaults & diagnostics" },
 ];
