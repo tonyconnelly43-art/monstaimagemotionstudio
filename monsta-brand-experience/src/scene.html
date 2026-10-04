@@ -6,7 +6,7 @@
 <style>
   @font-face { font-family: "Anton"; src: url("../assets/fonts/Anton.woff2") format("woff2"); }
   @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
-  html, body { margin: 0; background: #000; overflow: hidden; }
+  html, body { margin: 0; background: #0b1730; overflow: hidden; }
   canvas { display: block; }
 </style>
 </head>
@@ -17,7 +17,7 @@
 // render(t) draws the frame at video time t (seconds). All cue times below are
 // in video time; the voiceover starts at t = 1.0s.
 const W = 1920, H = 1080, DURATION = 27;
-const RED = '#e11d26', RED_DK = '#8e0b12', RED_DEEP = '#4a0509', INK = '#0a0a0c', CARD = '#141418';
+const RED = '#e11d26', RED_DK = '#8e0b12', RED_DEEP = '#4a0509', INK = '#0b1730', CARD = '#13244a', NAVY_DEEP = '#050c1c';
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 
@@ -116,7 +116,7 @@ function background(t) {
   // red glow
   const pulse = 0.22 + 0.06 * Math.sin(t * 2.2) + (t > CUE.voEnd ? 0.18 * eOut(P(t, CUE.voEnd, 0.6)) : 0);
   const g = ctx.createRadialGradient(W / 2, H / 2, 50, W / 2, H / 2, 1000);
-  g.addColorStop(0, `rgba(170,14,22,${pulse})`); g.addColorStop(0.55, 'rgba(90,5,10,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  g.addColorStop(0, `rgba(170,14,22,${pulse})`); g.addColorStop(0.55, 'rgba(90,5,10,0.08)'); g.addColorStop(1, 'rgba(11,23,48,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   // particles
   for (const p of PARTS) {
@@ -130,7 +130,7 @@ function background(t) {
 }
 function vignette() {
   const g = ctx.createRadialGradient(W / 2, H / 2, 500, W / 2, H / 2, 1250);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.75)');
+  g.addColorStop(0, 'rgba(5,12,28,0)'); g.addColorStop(1, 'rgba(5,12,28,0.75)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
 
@@ -151,7 +151,7 @@ function iconEye(t, k) {
   ctx.beginPath(); ctx.moveTo(-80, 0); ctx.quadraticCurveTo(0, -78 * open, 80, 0); ctx.quadraticCurveTo(0, 78 * open, -80, 0); ctx.clip();
   const lx = Math.sin(t * 2) * 10;
   ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(lx, 0, 30, 0, 7); ctx.fill();
-  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(lx, 0, 14, 0, 7); ctx.fill();
+  ctx.fillStyle = NAVY_DEEP; ctx.beginPath(); ctx.arc(lx, 0, 14, 0, 7); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(lx + 9, -9, 6, 0, 7); ctx.fill();
   ctx.restore();
 }
@@ -193,7 +193,7 @@ function iconVan(t, k) {
   ctx.beginPath(); ctx.moveTo(-120, 40); ctx.lineTo(-120, -55); ctx.quadraticCurveTo(-120, -64, -110, -64); ctx.lineTo(50, -64);
   ctx.quadraticCurveTo(66, -64, 76, -48); ctx.lineTo(108, -6); ctx.quadraticCurveTo(118, 4, 118, 18); ctx.lineTo(118, 40); ctx.closePath(); ctx.fill();
   // windshield
-  ctx.fillStyle = '#1b1b22';
+  ctx.fillStyle = '#0f1d3d';
   ctx.beginPath(); ctx.moveTo(56, -54); ctx.lineTo(70, -54); ctx.lineTo(100, -12); ctx.lineTo(56, -12); ctx.closePath(); ctx.fill();
   // red wrap swoosh
   ctx.save(); ctx.beginPath(); ctx.moveTo(-120, 40); ctx.lineTo(-120, -55); ctx.lineTo(50, -64); ctx.lineTo(118, 18); ctx.lineTo(118, 40); ctx.closePath(); ctx.clip();
@@ -205,7 +205,7 @@ function iconVan(t, k) {
   text('M', -50, -32, { size: 40, color: RED });
   // wheels
   for (const wx of [-72, 72]) {
-    ctx.fillStyle = '#0d0d10'; ctx.beginPath(); ctx.arc(wx, 42, 24, 0, 7); ctx.fill();
+    ctx.fillStyle = NAVY_DEEP; ctx.beginPath(); ctx.arc(wx, 42, 24, 0, 7); ctx.fill();
     ctx.fillStyle = '#8b8b93'; ctx.beginPath(); ctx.arc(wx, 42, 10, 0, 7); ctx.fill();
   }
   ctx.restore();
@@ -219,7 +219,7 @@ function iconPrint(t, k) {
   ctx.restore();
   // business card
   ctx.save(); ctx.translate(lerp(20, 46, eOut(k)), lerp(40, 34, eOut(k))); ctx.rotate(lerp(0, 0.12, eOut(k)));
-  ctx.fillStyle = '#18181d'; ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3;
+  ctx.fillStyle = '#0f1d3d'; ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3;
   rrect(-80, -46, 160, 92, 8); ctx.fill(); ctx.stroke();
   ctx.fillStyle = RED; ctx.fillRect(-80, 24, 160, 10);
   text('MONSTA', -10, -12, { size: 30, color: '#fff', align: 'center' });
@@ -227,19 +227,19 @@ function iconPrint(t, k) {
 }
 function iconDigital(t, k) {
   // monitor
-  ctx.fillStyle = '#2a2a31'; rrect(-110, -78, 190, 124, 10); ctx.fill();
+  ctx.fillStyle = '#22355e'; rrect(-110, -78, 190, 124, 10); ctx.fill();
   const g = ctx.createLinearGradient(-100, -70, 70, 40); g.addColorStop(0, RED); g.addColorStop(1, RED_DEEP);
   ctx.fillStyle = g; rrect(-100, -68, 170, 104, 5); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   const bw = 120 * eOut(P(k, .2, .6));
   rrect(-84, -52, bw, 14, 5); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.4)'; rrect(-84, -28, bw * 0.7, 10, 5); ctx.fill(); rrect(-84, -12, bw * 0.55, 10, 5); ctx.fill();
-  ctx.fillStyle = '#2a2a31'; ctx.fillRect(-25, 46, 20, 22); rrect(-55, 66, 80, 10, 5); ctx.fill();
+  ctx.fillStyle = '#22355e'; ctx.fillRect(-25, 46, 20, 22); rrect(-55, 66, 80, 10, 5); ctx.fill();
   // phone
   const py = lerp(60, 0, eBack(P(k, .15, .6)));
   ctx.save(); ctx.translate(86, 18 + py);
   ctx.fillStyle = '#f2f2f4'; rrect(-34, -62, 68, 124, 12); ctx.fill();
-  ctx.fillStyle = '#16161b'; rrect(-28, -52, 56, 100, 6); ctx.fill();
+  ctx.fillStyle = '#0f1d3d'; rrect(-28, -52, 56, 100, 6); ctx.fill();
   ctx.fillStyle = RED; rrect(-22, -44, 44, 30, 4); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.5)'; rrect(-22, -6, 44, 7, 3); ctx.fill(); rrect(-22, 6, 30, 7, 3); ctx.fill();
   ctx.restore();
@@ -533,7 +533,7 @@ function render(t) {
   flash(t);
   vignette();
   const fo = P(t, CUE.fadeOut, DURATION - CUE.fadeOut);
-  if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${eIn(fo) * 0.3 + fo * 0.7})`; ctx.fillRect(0, 0, W, H); }
+  if (fo > 0) { ctx.fillStyle = `rgba(5,12,28,${eIn(fo) * 0.3 + fo * 0.7})`; ctx.fillRect(0, 0, W, H); }
 }
 
 window.DURATION = DURATION;
