@@ -11,7 +11,7 @@
 | 13–17s | "then bring them to life across your vehicles, print, digital, and beyond." | BRING IT TO LIFE; Vehicles, Print, Digital and & Beyond cards land on each word |
 | 17.5–20.5s | "Everything connected. Everything unmistakably yours." | Cards link up to a Monsta hub; YOURS. in red |
 | 20.6–22.2s | "That's the Monsta Brand Experience." | Logo hero + BRAND EXPERIENCE |
-| 22.2–27s | — (music swells to full) | Light rays, particle burst, tagline, fade out |
+| 22.2–27s | — (music swells to full) | Light rays, particle burst, "Branding that eats the competition." tagline, fade out |
 
 Audio: the VO starts at 1.0s. The hip-hop cover starts at its beat drop (16.3s into the song). It's ducked to about -14 dB under the VO, then ramps up to full volume over 0.7s once the VO ends, and fades out over the last 1.6s.
 
