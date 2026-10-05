@@ -1,0 +1,484 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Monsta Demo Reel</title>
+<style>
+  @font-face { font-family: "Anton"; src: url("../assets/fonts/Anton.woff2") format("woff2"); }
+  @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; background: #0b1730; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Monsta demo reel — 1920x1080, 45s. render(t) draws the frame at video time t.
+// Music: "Overdrive" starting 20.47s into the song so its drop (25.67s) hits at
+// t = 5.2, right after the intro VO. Every cut sits on the 150 BPM beat grid.
+const W = 1920, H = 1080, DURATION = 45;
+const RED = '#e11d26', RED_DK = '#8e0b12', INK = '#0b1730', NAVY_DEEP = '#050c1c', CARD = '#13244a';
+const DROP = 5.2, BEAT = 0.4;
+const bt = n => DROP + n * BEAT;
+const END_T = bt(85);
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// ---------- helpers ----------
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, start, dur) => cl((t - start) / dur);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIn = x => x * x * x;
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function setFont(font, size, weight) { ctx.font = `${weight || (font === 'Anton' ? 400 : 900)} ${size}px "${font}"`; }
+function text(s, x, y, o = {}) {
+  const { font = 'Anton', size = 100, weight, color = '#fff', align = 'center', alpha = 1, ls = 0, scale = 1, rot = 0, glow = 0, glowColor = RED, stroke = 0, strokeColor = NAVY_DEEP } = o;
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.translate(x, y); ctx.rotate(rot); ctx.scale(scale, scale);
+  setFont(font, size, weight);
+  ctx.letterSpacing = ls + 'px';
+  ctx.textAlign = align; ctx.textBaseline = 'middle';
+  const dx = align === 'center' ? ls / 2 : 0;
+  if (stroke) { ctx.lineJoin = 'round'; ctx.lineWidth = stroke; ctx.strokeStyle = strokeColor; ctx.strokeText(s, dx, 0); }
+  if (glow) { ctx.shadowColor = glowColor; ctx.shadowBlur = glow; }
+  ctx.fillStyle = color;
+  ctx.fillText(s, dx, 0);
+  ctx.restore();
+}
+function measure(s, font, size, ls = 0, weight) { ctx.save(); setFont(font, size, weight); ctx.letterSpacing = ls + 'px'; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+function reveal(s, x, y, prog, o = {}) {
+  if (prog <= 0) return;
+  const size = o.size || 100;
+  const w = measure(s, o.font || 'Anton', size, o.ls || 0, o.weight) + 60;
+  const left = o.align === 'left' ? x - 30 : x - w / 2;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(left, y - size * 0.8, w, size * 1.6); ctx.clip();
+  text(s, x, y + (1 - eOut(prog)) * size * 1.3, o);
+  ctx.restore();
+}
+function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+// ---------- assets ----------
+const IMG = {};
+const NAMES = [
+  'monsta-logo.png',
+  'van-yardheros.webp', 'van-amptheory.webp', 'van-mammoth.webp', 'van-apex.webp', 'van-onpar.webp', 'van-clearpoint.webp',
+  'van-grizzly.webp', 'van-knockdust.webp', 'van-truenorth.webp', 'van-beacon.webp', 'van-svac.webp',
+  'layout-kraken.jpg', 'layout-bugbounty.jpg', 'mascots-1.jpg', 'mascots-2.jpg',
+  'polo-yardheros-front.webp', 'polo-yardheros-back.webp', 'polo-apex-front.webp', 'polo-apex-back.webp',
+  'polo-amptheory-front.webp', 'polo-amptheory-back.webp', 'polo-mammoth-front.webp', 'polo-mammoth-back.webp',
+  'polo-svac-front.webp', 'polo-svac-back.webp', 'polo-levelup-back.webp',
+  'print-truenorth.webp', 'print-amptheory.webp', 'print-apex.webp', 'print-captaingutter.webp', 'print-grizzly.webp', 'print-aircommand.webp',
+  'package-grizzly.jpg', 'package-adelaide.jpg', 'package-clearpoint.jpg',
+  'bts-onpar-illustrator.jpg', 'bts-kraken-illustrator.jpg',
+];
+const SKETCH_FRAMES = 96;
+function loadImg(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+const loads = NAMES.map(n => loadImg('../assets/img/' + n).then(i => { IMG[n.replace(/\.\w+$/, '')] = i; }));
+const SKETCH = [];
+for (let k = 1; k <= SKETCH_FRAMES; k++) loads.push(loadImg(`../assets/clip/sketch_${String(k).padStart(3, '0')}.jpg`).then(i => { SKETCH[k - 1] = i; }));
+loads.push(loadImg('../assets/clip/final.jpg').then(i => { IMG.sketchFinal = i; }));
+
+// small blurred copy of an image, used to fill letterbox areas
+const BLUR = new Map();
+function blurred(img) {
+  if (BLUR.has(img)) return BLUR.get(img);
+  const c = document.createElement('canvas'); c.width = 480; c.height = 270;
+  const g = c.getContext('2d');
+  const s = Math.max(480 / img.width, 270 / img.height);
+  g.filter = 'blur(14px) brightness(0.45) saturate(1.2)';
+  g.drawImage(img, (480 - img.width * s) / 2, (270 - img.height * s) / 2, img.width * s, img.height * s);
+  BLUR.set(img, c); return c;
+}
+// draw img fit inside (contain) a box, centered at cx,cy, with blurred fill behind
+function containShot(img, zoom = 1, src = null, fill = true) {
+  const sx = src ? src[0] : 0, sy = src ? src[1] : 0, sw = src ? src[2] : img.width, sh = src ? src[3] : img.height;
+  if (fill) ctx.drawImage(blurred(img), -40, -40, W + 80, H + 80);
+  const s = Math.min(W / sw, H / sh) * zoom;
+  ctx.drawImage(img, sx, sy, sw, sh, W / 2 - sw * s / 2, H / 2 - sh * s / 2, sw * s, sh * s);
+}
+
+// ---------- background ----------
+const PARTS = (() => { const r = rng(7); return Array.from({ length: 70 }, () => ({ x: r() * W, y: r() * H, v: 20 + r() * 60, s: 1 + r() * 3, a: 0.12 + r() * 0.4, red: r() < 0.55, ph: r() * 6.28 })); })();
+function background(t, tint) {
+  ctx.fillStyle = INK; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.028)'; ctx.lineWidth = 2;
+  const off = (t * 40) % 60;
+  for (let i = -40; i < 80; i++) { const x = i * 60 + off; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x - 620, H); ctx.stroke(); }
+  ctx.restore();
+  const g = ctx.createRadialGradient(W / 2, H / 2, 50, W / 2, H / 2, 1050);
+  g.addColorStop(0, tint || 'rgba(170,14,22,0.28)'); g.addColorStop(1, 'rgba(11,23,48,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const p of PARTS) {
+    const y = ((p.y - t * p.v) % H + H) % H;
+    ctx.globalAlpha = p.a * (0.6 + 0.4 * Math.sin(t * 3 + p.ph));
+    ctx.fillStyle = p.red ? RED : '#fff';
+    ctx.beginPath(); ctx.arc(p.x + Math.sin(t * 0.8 + p.ph) * 20, y, p.s, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+function vignette(a = 0.7) {
+  const g = ctx.createRadialGradient(W / 2, H / 2, 520, W / 2, H / 2, 1250);
+  g.addColorStop(0, 'rgba(5,12,28,0)'); g.addColorStop(1, `rgba(5,12,28,${a})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function speedLines(t, tint, strength) {
+  const r = rng(99);
+  ctx.save(); ctx.globalAlpha = strength;
+  for (let i = 0; i < 26; i++) {
+    const y = r() * H, len = 200 + r() * 600, sp = 2500 + r() * 2500;
+    const x = ((r() * W - t * sp) % (W + len) + W + len) % (W + len) - len;
+    ctx.fillStyle = i % 3 ? 'rgba(255,255,255,0.10)' : hexA(tint, 0.35);
+    ctx.fillRect(x, y, len, 2 + r() * 3);
+  }
+  ctx.restore();
+}
+
+// ---------- shots ----------
+// Each shot: [startBeat, endBeat, drawFn(localTime, dur, t)]
+const SHOTS = [];
+const SECTIONS = [];
+function section(title, n0, n1) { SECTIONS.push({ title, t0: bt(n0), t1: bt(n1) }); }
+
+// Logo slam on the drop
+SHOTS.push([0, 4, (lt, d, t) => {
+  background(t);
+  const k = P(lt, 0, 0.25);
+  const kr = P(lt, 0.05, 0.8);
+  if (kr < 1) { ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - kr)})`; ctx.lineWidth = 12 * (1 - kr) + 1; ctx.beginPath(); ctx.ellipse(W / 2, 460, 300 + 1000 * eOut(kr), 110 + 380 * eOut(kr), 0, 0, 7); ctx.stroke(); ctx.restore(); }
+  drawLogo(W / 2, 460, 1000 * lerp(2.4, 1, eOut(k)) * (1 + 0.02 * Math.sin(lt * 15.7)), cl(k * 5), 40);
+  const s = 'DEMO REEL', size = 120, ls = 30;
+  let x = W / 2 - measure(s, 'Anton', size, ls) / 2 + ls / 2;
+  for (let i = 0; i < s.length; i++) {
+    const cw = measure(s[i], 'Anton', size, ls);
+    const kk = P(lt, 2 * BEAT + i * 0.03, 0.25);
+    if (kk > 0) text(s[i], x + cw / 2, 790 + (1 - eOut(kk)) * 70, { size, ls, alpha: kk, color: i < 4 ? RED : '#fff' });
+    x += cw;
+  }
+}]);
+
+// Vehicle wraps: cutout vans drive through on every 2 beats, then two full layouts
+section('VEHICLE WRAPS', 4, 30);
+const VANS = [
+  ['van-yardheros', '#e0602a'], ['van-amptheory', '#39d353'], ['van-mammoth', '#4a76c9'], ['van-apex', '#e23b2a'],
+  ['van-onpar', '#5cbf4a'], ['van-clearpoint', '#2f8fe0'], ['van-grizzly', '#e8822f'], ['van-knockdust', '#c9a35a'],
+  ['van-truenorth', '#2fc6d9'], ['van-beacon', '#e7b33a'], ['van-svac', '#2fae78'],
+];
+VANS.forEach(([name, tint], i) => {
+  SHOTS.push([4 + i * 2, 6 + i * 2, (lt, d, t) => {
+    background(t, hexA(tint, 0.42));
+    const enter = eOut(P(lt, 0, 0.26)), exit = eIn(P(lt, d - 0.2, 0.2));
+    const vel = (1 - P(lt, 0, 0.26)) + P(lt, d - 0.2, 0.2);
+    speedLines(t, tint, 0.4 + 0.6 * vel);
+    // giant outlined word behind
+    ctx.save(); ctx.globalAlpha = 0.07; text('WRAPS', W / 2 - lt * 120, 560, { size: 520, color: 'rgba(0,0,0,0)', stroke: 6, strokeColor: '#fff', ls: 20 }); ctx.restore();
+    const x = lerp(-1500, 0, enter) + lt * 40 + lerp(0, 1900, exit);
+    drawVan(IMG[name], W / 2 + x, 880, vel);
+  }]);
+});
+[['layout-kraken', [0, 0, 2000, 1480]], ['layout-bugbounty', [0, 0, 2000, 1480]]].forEach(([name, src], i) => {
+  SHOTS.push([26 + i * 2, 28 + i * 2, (lt, d, t) => { punch(lt); containShot(IMG[name], 1 + lt * 0.05, src); }]);
+});
+
+// Mascots: three panels per sheet pop in on the beat
+section('CUSTOM MASCOTS', 30, 38);
+['mascots-1', 'mascots-2'].forEach((name, i) => {
+  SHOTS.push([30 + i * 4, 34 + i * 4, (lt, d, t) => {
+    const img = IMG[name];
+    const s = 1080 / img.height * (1.0 + lt * 0.03), w = img.width * s, x0 = W / 2 - w / 2, y0 = H / 2 - img.height * s / 2;
+    ctx.drawImage(blurred(img), -40, -40, W + 80, H + 80);
+    ctx.save(); ctx.globalAlpha = 0.25; ctx.drawImage(img, x0, y0, w, img.height * s); ctx.restore();
+    const cuts = [0, 425, 855, img.width];
+    for (let p = 0; p < 3; p++) {
+      const k = P(lt, p * BEAT, 0.22);
+      if (k <= 0) continue;
+      const sx = cuts[p], sw = cuts[p + 1] - cuts[p];
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x0 + sx * s, y0, sw * s, img.height * s); ctx.clip();
+      const dy = (1 - eOut(k)) * 120;
+      ctx.drawImage(img, x0, y0 + dy, w, img.height * s);
+      const fl = 1 - P(lt, p * BEAT, 0.25);
+      if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${0.5 * fl})`; ctx.fillRect(x0 + sx * s, y0, sw * s, img.height * s); }
+      ctx.restore();
+    }
+  }]);
+});
+
+// Apparel: front + back polo pairs
+section('BRANDED APPAREL', 38, 50);
+const POLOS = [
+  ['polo-yardheros-front', 'polo-yardheros-back', '#e0602a'], ['polo-apex-front', 'polo-apex-back', '#e23b2a'],
+  ['polo-amptheory-front', 'polo-amptheory-back', '#39d353'], ['polo-mammoth-front', 'polo-mammoth-back', '#4a76c9'],
+  ['polo-svac-front', 'polo-svac-back', '#2fae78'], [null, 'polo-levelup-back', '#5cbf4a'],
+];
+POLOS.forEach(([front, back, tint], i) => {
+  SHOTS.push([38 + i * 2, 40 + i * 2, (lt, d, t) => {
+    background(t, hexA(tint, 0.5));
+    ctx.save(); ctx.globalAlpha = 0.07; text('APPAREL', W / 2 + lt * 100, 560, { size: 470, color: 'rgba(0,0,0,0)', stroke: 6, strokeColor: '#fff', ls: 16 }); ctx.restore();
+    const k = eOut(P(lt, 0, 0.3)), kb = eOut(P(lt, 0.08, 0.3));
+    const h = 1180, bob = Math.sin(lt * 4) * 6;
+    if (front) {
+      drawPolo(IMG[front], lerp(-400, 640, k), 560 + bob, h, lerp(-0.25, -0.04, k));
+      drawPolo(IMG[back], lerp(W + 400, 1280, kb), 560 - bob, h, lerp(0.25, 0.04, kb));
+    } else {
+      drawPolo(IMG[back], W / 2, lerp(1400, 560, kb) + bob, h, 0);
+    }
+  }]);
+});
+
+// Print: full stationery sets with a push-in
+section('PRINT & STATIONERY', 50, 62);
+['print-truenorth', 'print-amptheory', 'print-apex', 'print-captaingutter', 'print-grizzly', 'print-aircommand'].forEach((name, i) => {
+  SHOTS.push([50 + i * 2, 52 + i * 2, (lt, d, t) => {
+    punch(lt);
+    const img = IMG[name];
+    ctx.drawImage(blurred(img), -40, -40, W + 80, H + 80);
+    const z = 1.0 + lt * 0.07, s = Math.max(W / img.width, H / img.height) * z;
+    const dir = i % 2 ? 1 : -1;
+    ctx.drawImage(img, W / 2 - img.width * s / 2 + dir * lt * 50, H / 2 - img.height * s / 2, img.width * s, img.height * s);
+  }]);
+});
+
+// Behind the scenes: Illustrator shots, then the sketch timelapse resolving to the final mascot
+section('BEHIND THE SCENES', 62, 76);
+['bts-onpar-illustrator', 'bts-kraken-illustrator'].forEach((name, i) => {
+  SHOTS.push([62 + i * 2, 64 + i * 2, (lt, d, t) => {
+    background(t, 'rgba(60,110,200,0.25)');
+    const img = IMG[name];
+    const k = eOut(P(lt, 0, 0.3));
+    const maxW = 1500, maxH = 840, s = Math.min(maxW / img.width, maxH / img.height) * (1 + lt * 0.04);
+    const w = img.width * s, h = img.height * s;
+    ctx.save(); ctx.translate(W / 2, H / 2 + 30 + (1 - k) * 200); ctx.rotate((i ? 0.02 : -0.02) * (1 - k * 0.5));
+    windowFrame(w, h, 'Adobe Illustrator');
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }]);
+});
+SHOTS.push([66, 74, (lt, d, t) => {
+  background(t, 'rgba(225,29,38,0.25)');
+  const f = Math.min(SKETCH_FRAMES - 1, Math.floor(lt / d * SKETCH_FRAMES));
+  const k = eOut(P(lt, 0, 0.3)), size = 860;
+  ctx.save(); ctx.translate(W / 2 + 270, H / 2 + 20 + (1 - k) * 300);
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 40;
+  ctx.fillStyle = '#fff'; rrect(-size / 2, -size / 2, size, size, 18); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.save(); rrect(-size / 2, -size / 2, size, size, 18); ctx.clip();
+  ctx.drawImage(SKETCH[f], -size / 2, -size / 2, size, size);
+  ctx.restore();
+  ctx.restore();
+  // progress label
+  const pct = Math.round(lt / d * 100);
+  reveal('FROM SKETCH', 400, 420, P(lt, 0.1, 0.4), { size: 110, align: 'center' });
+  reveal('TO MONSTA.', 400, 545, P(lt, 0.5, 0.4), { size: 110, color: RED });
+  const bw = 480;
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; rrect(400 - bw / 2, 650, bw, 12, 6); ctx.fill();
+  ctx.fillStyle = RED; rrect(400 - bw / 2, 650, bw * lt / d, 12, 6); ctx.fill();
+  text(`${pct}%`, 400, 700, { font: 'Montserrat', size: 30, weight: 800, color: '#c9c9cf', ls: 6 });
+}]);
+SHOTS.push([74, 76, (lt, d, t) => {
+  const img = IMG.sketchFinal, k = P(lt, 0, 0.25);
+  ctx.drawImage(blurred(img), -40, -40, W + 80, H + 80);
+  const size = 1080 * lerp(1.25, 1, eOut(k));
+  ctx.drawImage(img, W / 2 - size / 2, H / 2 - size / 2, size, size);
+}]);
+
+// Full brand packages: tall boards scroll top-to-bottom next to the package name
+section('FULL BRAND PACKAGES', 76, 85);
+[['package-grizzly', 'GRIZZLY COMFORT', '#e8822f'], ['package-adelaide', 'ADELAIDE HEATING', '#f2b33a'], ['package-clearpoint', 'CLEAR POINT', '#2f8fe0']].forEach(([name, label, tint], i) => {
+  SHOTS.push([76 + i * 3, 79 + i * 3, (lt, d, t) => {
+    background(t, hexA(tint, 0.45));
+    const img = IMG[name], cw = 720, s = cw / img.width, ch = img.height * s;
+    const scroll = eIO(P(lt, 0.15, d - 0.25)) * (ch - 960);
+    const k = eOut(P(lt, 0, 0.3));
+    ctx.save(); ctx.translate(1340 + (1 - k) * 700, 0);
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 50;
+    ctx.fillStyle = '#000'; rrect(-cw / 2, 60, cw, 960, 22); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.save(); rrect(-cw / 2, 60, cw, 960, 22); ctx.clip();
+    ctx.drawImage(img, -cw / 2, 60 - scroll, cw, ch);
+    ctx.restore(); ctx.restore();
+    reveal(label, 90, 450, P(lt, 0.05, 0.35), { size: 104, align: 'left' });
+    reveal('LOGO · MASCOT · WRAP', 90, 560, P(lt, 0.25, 0.35), { font: 'Montserrat', size: 36, ls: 6, align: 'left', color: hexA(tint, 1) });
+    reveal('APPAREL · PRINT · SOCIAL', 90, 615, P(lt, 0.35, 0.35), { font: 'Montserrat', size: 36, ls: 6, align: 'left', color: '#c9c9cf' });
+  }]);
+});
+
+// ---------- drawing pieces ----------
+const LOGO_AR = 242 / 800;
+function drawLogo(cx, cy, w, alpha = 1, glow = 0) {
+  if (alpha <= 0) return;
+  ctx.save(); ctx.globalAlpha *= alpha;
+  if (glow) { ctx.shadowColor = 'rgba(225,29,38,0.85)'; ctx.shadowBlur = glow; }
+  ctx.drawImage(IMG['monsta-logo'], cx - w / 2, cy - w * LOGO_AR / 2, w, w * LOGO_AR);
+  ctx.restore();
+}
+// Vans come in two mockup sizes; normalise by body width and wheel line.
+function drawVan(img, cx, groundY, blur) {
+  const small = img.width === 1500;
+  const bodyL = small ? 109 : 0, bodyR = small ? 1334 : 2000, bottom = small ? 635 : 1027;
+  const s = 1300 / (bodyR - bodyL);
+  const x0 = cx - (bodyL + bodyR) / 2 * s, y0 = groundY - bottom * s;
+  // ground shadow
+  ctx.save(); ctx.translate(cx, groundY); ctx.scale(1, 0.07);
+  const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 720);
+  g.addColorStop(0, 'rgba(0,0,0,0.6)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(-800, -800, 1600, 1600); ctx.restore();
+  for (let k = 3; k >= 1; k--) {
+    if (blur < 0.05) break;
+    ctx.save(); ctx.globalAlpha = 0.18 * blur; ctx.drawImage(img, x0 - k * 70 * blur, y0, img.width * s, img.height * s); ctx.restore();
+  }
+  ctx.drawImage(img, x0, y0, img.width * s, img.height * s);
+}
+function drawPolo(img, cx, cy, h, rot) {
+  const s = h / img.height;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 20;
+  ctx.drawImage(img, -img.width * s / 2, -h / 2, img.width * s, h);
+  ctx.restore();
+}
+function windowFrame(w, h, title) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 50;
+  ctx.fillStyle = '#2b2b30'; rrect(-w / 2 - 10, -h / 2 - 52, w + 20, h + 62, 16); ctx.fill();
+  ctx.restore();
+  ['#ff5f57', '#febc2e', '#28c840'].forEach((c, i) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(-w / 2 + 22 + i * 30, -h / 2 - 26, 9, 0, 7); ctx.fill(); });
+  text(title, 0, -h / 2 - 25, { font: 'Montserrat', size: 22, weight: 700, color: '#bbb', ls: 2 });
+}
+function punch(lt) { const k = P(lt, 0, 0.22); const s = lerp(1.08, 1, eOut(k)); ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.translate(-W / 2, -H / 2); }
+
+// Section title: slams big in the centre, then tucks into a top-left badge.
+function sectionTitle(t) {
+  for (const sc of SECTIONS) {
+    if (t < sc.t0 || t >= sc.t1) continue;
+    const lt = t - sc.t0;
+    const slam = P(lt, 0, 0.18), tuck = eIO(P(lt, 0.55, 0.3)), out = P(t, sc.t1 - 0.15, 0.15);
+    const big = 150, fullW = measure(sc.title, 'Anton', big, 6);
+    const s = lerp(lerp(1.5, 1, eOut(slam)), 0.36, tuck);
+    const x = lerp(W / 2, 70 + fullW * 0.36 / 2 + 24, tuck), y = lerp(H / 2, 92, tuck);
+    ctx.save(); ctx.globalAlpha = cl(slam * 4) * (1 - out);
+    ctx.translate(x, y); ctx.scale(s, s);
+    // backing band
+    ctx.fillStyle = 'rgba(5,12,28,0.82)'; rrect(-fullW / 2 - 50, -big * 0.72, fullW + 100, big * 1.44, 22); ctx.fill();
+    ctx.fillStyle = RED; ctx.fillRect(-fullW / 2 - 50, big * 0.72 - 16, (fullW + 100) * eOut(P(lt, 0.1, 0.4)), 16);
+    text(sc.title, 0, 4, { size: big, ls: 6 });
+    ctx.restore();
+  }
+}
+function cutFlash(t) {
+  // quick white flash on section starts and the drop
+  for (const tt of [DROP, ...SECTIONS.map(s => s.t0), END_T]) {
+    const k = P(t, tt, 0.22);
+    if (k > 0 && k < 1) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - k)})`; ctx.fillRect(0, 0, W, H); }
+  }
+}
+
+// ---------- intro (0 – DROP) ----------
+const THUMBS = ['van-yardheros', 'print-truenorth', 'van-apex', 'print-captaingutter', 'van-grizzly', 'print-amptheory', 'van-mammoth', 'print-aircommand', 'van-onpar', 'print-apex'];
+function intro(t) {
+  background(t);
+  // dim wall of work drifting behind the words
+  ctx.save(); ctx.globalAlpha = 0.13; ctx.translate(W / 2, H / 2); ctx.rotate(-0.12); ctx.translate(-W / 2, -H / 2);
+  for (let row = 0; row < 4; row++) {
+    for (let c = -1; c < 6; c++) {
+      const img = IMG[THUMBS[(row * 3 + c + 10) % THUMBS.length]];
+      const tw = 420, th = 260, x = c * 450 + ((t * (row % 2 ? 50 : -50)) % 450), y = -60 + row * 300;
+      ctx.drawImage(img, x, y, tw, th);
+    }
+  }
+  ctx.restore();
+  vignette(0.85);
+  const zoom = 1 + eIn(P(t, 4.3, 0.9)) * 0.25;
+  const sh = P(t, 4.2, 1.0) * 8;
+  ctx.save(); ctx.translate(W / 2 + Math.sin(t * 60) * sh, H / 2 + Math.cos(t * 47) * sh); ctx.scale(zoom, zoom); ctx.translate(-W / 2, -H / 2);
+  const out1 = eIn(P(t, 2.45, 0.25));
+  ctx.save(); ctx.globalAlpha = 1 - out1; ctx.translate(0, -out1 * 120);
+  reveal('YOUR BUSINESS', W / 2, 380, P(t, 0.35, 0.35), { size: 150, ls: 4 });
+  reveal('DESERVES MORE', W / 2, 540, P(t, 0.95, 0.35), { size: 150, ls: 4 });
+  const kl = P(t, 1.5, 0.3);
+  if (kl > 0) {
+    reveal('THAN A', W / 2 - 170, 700, kl, { size: 150, ls: 4 });
+    text('LOGO.', W / 2 + 230, 700, { size: 150, ls: 4, color: RED, scale: lerp(1.6, 1, eOut(P(t, 1.75, 0.25))), alpha: cl(P(t, 1.75, 0.08)) });
+  }
+  ctx.restore();
+  reveal('IT DESERVES', W / 2, 370, P(t, 2.72, 0.3), { size: 130, ls: 4, color: '#c9c9cf' });
+  reveal('A BRAND THEY', W / 2, 520, P(t, 3.15, 0.3), { size: 150, ls: 4 });
+  const ki = P(t, 3.6, 0.25);
+  if (ki > 0) text("CAN'T IGNORE.", W / 2, 700, { size: 190, ls: 6, color: RED, scale: lerp(1.8, 1, eOut(ki)), alpha: cl(ki * 4), glow: 30 });
+  ctx.restore();
+  // fade in from black
+  const fi = 1 - P(t, 0, 0.35);
+  if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- end card ----------
+const BURST = (() => { const r = rng(11); return Array.from({ length: 140 }, () => ({ ang: r() * Math.PI * 2, sp: 250 + r() * 900, s: 2 + r() * 5, red: r() < 0.7 })); })();
+function endCard(t) {
+  const lt = t - END_T;
+  background(t);
+  // rays
+  ctx.save(); ctx.translate(W / 2, 400); ctx.rotate(t * 0.25);
+  const ra = eOut(P(lt, 0, 0.8));
+  for (let i = 0; i < 16; i++) {
+    ctx.rotate(Math.PI * 2 / 16);
+    const g = ctx.createLinearGradient(0, 0, 1100, 0);
+    g.addColorStop(0, `rgba(225,29,38,${0.3 * ra})`); g.addColorStop(1, 'rgba(225,29,38,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1100, -70); ctx.lineTo(1100, 70); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  for (const b of BURST) {
+    const d = b.sp * (1 - Math.exp(-lt * 1.6));
+    ctx.globalAlpha = cl(1 - lt / 4) * 0.9; ctx.fillStyle = b.red ? RED : '#fff';
+    ctx.beginPath(); ctx.arc(W / 2 + Math.cos(b.ang) * d, 400 + Math.sin(b.ang) * d * 0.7, b.s, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  vignette(0.6);
+  const k = P(lt, 0, 0.3);
+  drawLogo(W / 2, 400, 1040 * lerp(1.8, 1, eOut(k)) * (1 + 0.015 * Math.sin(lt * Math.PI * 2.5)), cl(k * 5), 45);
+  // "Branding that eats the competition." lands with the VO line
+  const tl = 2.4;
+  const words = [['BRANDING', '#fff'], ['THAT', '#fff'], ['EATS', RED], ['THE', '#fff'], ['COMPETITION.', RED]];
+  const size = 92, gap = 26;
+  const ws = words.map(w => measure(w[0], 'Anton', size, 4));
+  let x = W / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (words.length - 1)) / 2;
+  words.forEach(([s, col], i) => {
+    const kk = P(lt, tl + i * 0.2, 0.25);
+    if (kk > 0) text(s, x + ws[i] / 2, 745 + (1 - eBack(kk)) * -60, { size, ls: 4, color: col, alpha: cl(kk * 4), scale: lerp(1.4, 1, eOut(kk)) });
+    x += ws[i] + gap;
+  });
+  const lw = 1000 * eOut(P(lt, tl + 0.9, 0.5));
+  if (lw > 0) { ctx.fillStyle = RED; ctx.fillRect(W / 2 - lw / 2, 812, lw, 7); }
+  reveal('MONSTAMEDIAANDDESIGN.COM', W / 2, 890, P(lt, 4.0, 0.5), { font: 'Montserrat', size: 44, weight: 800, ls: 10, color: '#e6e6ea' });
+}
+
+// ---------- main ----------
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+  if (t < DROP) { intro(t); }
+  else if (t >= END_T) { endCard(t); }
+  else {
+    for (const [n0, n1, fn] of SHOTS) {
+      const a = bt(n0), b = bt(n1);
+      if (t >= a && t < b) { ctx.save(); fn(t - a, b - a, t); ctx.restore(); break; }
+    }
+    vignette(0.45);
+    sectionTitle(t);
+  }
+  cutFlash(t);
+  const fo = P(t, DURATION - 0.8, 0.8);
+  if (fo > 0) { ctx.fillStyle = `rgba(5,12,28,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.DURATION = DURATION;
+window.ready = Promise.all([
+  document.fonts.load('400 100px "Anton"'), document.fonts.load('900 100px "Montserrat"'),
+  document.fonts.load('700 100px "Montserrat"'), document.fonts.load('800 100px "Montserrat"'), ...loads,
+]).then(() => { render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
