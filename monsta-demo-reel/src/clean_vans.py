@@ -1,27 +1,50 @@
-"""Turns the van mockups' baked white-background haze into a dark shadow.
+"""Builds the clean van cutouts used in the reel.
 
-Reads the original cutouts from assets/img-orig/ and writes cleaned copies to assets/img/.
+* The 1500px mockups share one van silhouette. Everything outside it (the baked
+  white-background shadow) is removed so each van sits on the reel's own shadow.
+* Kraken and Bug Bounty only exist as layout boards. Every board uses the same
+  mockup in the same spot (layout = 0.83 * cutout + (-1.47, 105.17), measured by
+  template-matching the SVAC and On Par cutouts against their boards), so the
+  top-left van is pulled out with that transform and the shared silhouette.
+* The 2000px mockups (True North, Mammoth) only get their white edge fringe trimmed.
+
+Reads originals from assets/img-orig/ and writes to assets/img/.
 """
 from pathlib import Path
 from PIL import Image, ImageFilter
-import numpy as np
+from scipy import ndimage
+import numpy as np, cv2
 
 root = Path(__file__).resolve().parent.parent / 'assets'
-for src in sorted((root / 'img-orig').glob('van-*.webp')):
-    im = Image.open(src).convert('RGBA')
-    a = np.array(im).astype(float)
-    al, lum = a[:, :, 3], a[:, :, :3].mean(2)
-    if im.width == 1500:
-        # light semi-transparent shadow haze -> black shadow
-        yy = np.arange(a.shape[0])[:, None] * np.ones((1, a.shape[1]))
-        haze = (al < 120) | ((al < 240) & (yy > 520) & (lum > 100))
-        a[haze, :3] = 0
-        a[haze, 3] = np.clip(al[haze] * 1.4, 0, 200)
+orig, out = root / 'img-orig', root / 'img'
+S, OX, OY = 0.83, -1.47, 105.17
+
+ref = np.array(Image.open(orig / 'van-svac.webp').convert('RGBA')).astype(np.float32)
+sil = ndimage.binary_fill_holes(ref[:, :, 3] >= 235)
+# soft 1px edge from the mockup's own anti-aliasing, clipped to the silhouette
+edge_alpha = np.where(sil, 255, 0).astype(np.float32)
+edge_alpha = np.array(Image.fromarray(edge_alpha.astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8))).astype(np.float32)
+edge_alpha = np.minimum(edge_alpha, np.where(sil, 255, 0))
+
+def save(rgb, alpha, name):
+    rgba = np.dstack([rgb, alpha]).clip(0, 255).astype(np.uint8)
+    Image.fromarray(rgba).save(out / name, quality=95)
+    print('wrote', name)
+
+for src in sorted(orig.glob('van-*.webp')):
+    a = np.array(Image.open(src).convert('RGBA')).astype(np.float32)
+    if a.shape[1] == 1500:
+        save(a[:, :, :3], edge_alpha, src.name)
     else:
-        # white fringe on the cutout edge -> erode 2px and darken the remaining edge
-        er = np.array(Image.fromarray(al.astype(np.uint8)).filter(ImageFilter.MinFilter(5))).astype(float)
-        a[:, :, 3] = er
-        edge = (er > 0) & (er < 230)
-        a[edge, :3] *= 0.45
-    Image.fromarray(a.astype(np.uint8)).save(root / 'img' / src.name, quality=95)
-    print('cleaned', src.name)
+        er = np.array(Image.fromarray(a[:, :, 3].astype(np.uint8)).filter(ImageFilter.MinFilter(5))).astype(np.float32)
+        rgb = a[:, :, :3].copy()
+        rim = (er > 0) & (er < 230)
+        rgb[rim] *= 0.45
+        save(rgb, er, src.name)
+
+h, w = sil.shape
+M = np.array([[S, 0, OX], [0, S, OY]], np.float32)  # cutout -> layout
+for board, name in [('layout-kraken.jpg', 'van-kraken.webp'), ('layout-bugbounty.jpg', 'van-bugbounty.webp')]:
+    L = cv2.imread(str(root / 'img' / board))[:, :, ::-1].astype(np.float32)
+    rgb = cv2.warpAffine(L, M, (w, h), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
+    save(rgb, edge_alpha, name)

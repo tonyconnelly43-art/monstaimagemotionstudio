@@ -6,7 +6,7 @@
 |---|---|---|
 | 0–5.2s | Intro VO over the music build | "Your business deserves more than a logo. It deserves a brand they can't ignore." over a dim wall of work |
 | 5.2s | Beat drop | Monsta logo slam |
-| 6.8–17.2s | Music | **Vehicle Wraps**: 11 vans drive through on the beat, then the Kraken and Bug Bounty layouts |
+| 6.8–17.2s | Music | **Vehicle Wraps**: 13 vans drive through on the beat |
 | 17.2–20.4s | Music | **Custom Mascots**: both character sheets, panels popping in on the beat |
 | 20.4–25.2s | Music | **Branded Apparel**: front/back polos for Yard Heros, Apex, Amp Theory, Mammoth, SVAC, Level Up (front + back) |
 | 25.2–30.0s | Music | **Print & Stationery**: True North, Amp Theory, Apex, Captain Gutter, Grizzly, Air Command |
@@ -21,6 +21,6 @@ The soundtrack starts 20.47s into "Overdrive", so its drop lands at 5.2s. Every 
 node src/render.mjs build/video_only.mp4 30   # frames via Playwright/Chromium -> ffmpeg
 GAIN=2.2dB ./src/mix.sh                       # VO + music -> monsta-demo-reel.mp4
 ```
-The van cutouts in `assets/img/` were cleaned by `src/clean_vans.py` (originals in `assets/img-orig/`), which turns the mockups' white shadow haze into a dark shadow.
+The van cutouts in `assets/img/` were cleaned by `src/clean_vans.py` (originals in `assets/img-orig/`), which strips the mockups' baked white-background shadow and pulls the Kraken and Bug Bounty vans off their layout boards.
 
 To add or reorder shots, edit the `SHOTS` list in `src/reel.html` (each entry is a start beat, an end beat and a draw function).

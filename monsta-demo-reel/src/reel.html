@@ -69,7 +69,7 @@ const NAMES = [
   'monsta-logo.png',
   'van-yardheros.webp', 'van-amptheory.webp', 'van-mammoth.webp', 'van-apex.webp', 'van-onpar.webp', 'van-clearpoint.webp',
   'van-grizzly.webp', 'van-knockdust.webp', 'van-truenorth.webp', 'van-beacon.webp', 'van-svac.webp',
-  'layout-kraken.jpg', 'layout-bugbounty.jpg', 'mascots-1.jpg', 'mascots-2.jpg',
+  'van-kraken.webp', 'van-bugbounty.webp', 'mascots-1.jpg', 'mascots-2.jpg',
   'polo-yardheros-front.webp', 'polo-yardheros-back.webp', 'polo-apex-front.webp', 'polo-apex-back.webp',
   'polo-amptheory-front.webp', 'polo-amptheory-back.webp', 'polo-mammoth-front.webp', 'polo-mammoth-back.webp',
   'polo-svac-front.webp', 'polo-svac-back.webp', 'polo-levelup-front.webp', 'polo-levelup-back.webp',
@@ -155,12 +155,13 @@ SHOTS.push([0, 4, (lt, d, t) => {
   drawLogo(W / 2, 540, 1100 * lerp(2.4, 1, eOut(k)) * (1 + 0.02 * Math.sin(lt * 15.7)), cl(k * 5), 40);
 }]);
 
-// Vehicle wraps: cutout vans drive through on every 2 beats, then two full layouts
+// Vehicle wraps: cutout vans drive through, one every 2 beats
 section('VEHICLE WRAPS', 4, 30);
 const VANS = [
-  ['van-yardheros', '#e0602a'], ['van-amptheory', '#39d353'], ['van-mammoth', '#4a76c9'], ['van-apex', '#e23b2a'],
-  ['van-onpar', '#5cbf4a'], ['van-clearpoint', '#2f8fe0'], ['van-grizzly', '#e8822f'], ['van-knockdust', '#c9a35a'],
-  ['van-truenorth', '#2fc6d9'], ['van-beacon', '#e7b33a'], ['van-svac', '#2fae78'],
+  ['van-yardheros', '#e0602a'], ['van-amptheory', '#39d353'], ['van-kraken', '#e2704f'], ['van-mammoth', '#4a76c9'],
+  ['van-apex', '#e23b2a'], ['van-onpar', '#5cbf4a'], ['van-bugbounty', '#e3b53a'], ['van-clearpoint', '#2f8fe0'],
+  ['van-grizzly', '#e8822f'], ['van-knockdust', '#c9a35a'], ['van-truenorth', '#2fc6d9'], ['van-beacon', '#e7b33a'],
+  ['van-svac', '#2fae78'],
 ];
 VANS.forEach(([name, tint], i) => {
   SHOTS.push([4 + i * 2, 6 + i * 2, (lt, d, t) => {
@@ -173,9 +174,6 @@ VANS.forEach(([name, tint], i) => {
     const x = lerp(-1500, 0, enter) + lt * 40 + lerp(0, 1900, exit);
     drawVan(IMG[name], W / 2 + x, 880, vel);
   }]);
-});
-[['layout-kraken', [0, 0, 2000, 1480]], ['layout-bugbounty', [0, 0, 2000, 1480]]].forEach(([name, src], i) => {
-  SHOTS.push([26 + i * 2, 28 + i * 2, (lt, d, t) => { punch(lt); containShot(IMG[name], 1 + lt * 0.05, src); }]);
 });
 
 // Mascots: three panels per sheet pop in on the beat
