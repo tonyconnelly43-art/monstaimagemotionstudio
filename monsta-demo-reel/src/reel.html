@@ -72,7 +72,7 @@ const NAMES = [
   'layout-kraken.jpg', 'layout-bugbounty.jpg', 'mascots-1.jpg', 'mascots-2.jpg',
   'polo-yardheros-front.webp', 'polo-yardheros-back.webp', 'polo-apex-front.webp', 'polo-apex-back.webp',
   'polo-amptheory-front.webp', 'polo-amptheory-back.webp', 'polo-mammoth-front.webp', 'polo-mammoth-back.webp',
-  'polo-svac-front.webp', 'polo-svac-back.webp', 'polo-levelup-back.webp',
+  'polo-svac-front.webp', 'polo-svac-back.webp', 'polo-levelup-front.webp', 'polo-levelup-back.webp',
   'print-truenorth.webp', 'print-amptheory.webp', 'print-apex.webp', 'print-captaingutter.webp', 'print-grizzly.webp', 'print-aircommand.webp',
   'package-grizzly.jpg', 'package-adelaide.jpg', 'package-clearpoint.jpg',
   'bts-onpar-illustrator.jpg', 'bts-kraken-illustrator.jpg',
@@ -146,21 +146,13 @@ const SHOTS = [];
 const SECTIONS = [];
 function section(title, n0, n1) { SECTIONS.push({ title, t0: bt(n0), t1: bt(n1) }); }
 
-// Logo slam on the drop
+// Logo slam on the drop (logo only)
 SHOTS.push([0, 4, (lt, d, t) => {
   background(t);
   const k = P(lt, 0, 0.25);
   const kr = P(lt, 0.05, 0.8);
-  if (kr < 1) { ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - kr)})`; ctx.lineWidth = 12 * (1 - kr) + 1; ctx.beginPath(); ctx.ellipse(W / 2, 460, 300 + 1000 * eOut(kr), 110 + 380 * eOut(kr), 0, 0, 7); ctx.stroke(); ctx.restore(); }
-  drawLogo(W / 2, 460, 1000 * lerp(2.4, 1, eOut(k)) * (1 + 0.02 * Math.sin(lt * 15.7)), cl(k * 5), 40);
-  const s = 'DEMO REEL', size = 120, ls = 30;
-  let x = W / 2 - measure(s, 'Anton', size, ls) / 2 + ls / 2;
-  for (let i = 0; i < s.length; i++) {
-    const cw = measure(s[i], 'Anton', size, ls);
-    const kk = P(lt, 2 * BEAT + i * 0.03, 0.25);
-    if (kk > 0) text(s[i], x + cw / 2, 790 + (1 - eOut(kk)) * 70, { size, ls, alpha: kk, color: i < 4 ? RED : '#fff' });
-    x += cw;
-  }
+  if (kr < 1) { ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - kr)})`; ctx.lineWidth = 12 * (1 - kr) + 1; ctx.beginPath(); ctx.ellipse(W / 2, 540, 300 + 1000 * eOut(kr), 110 + 380 * eOut(kr), 0, 0, 7); ctx.stroke(); ctx.restore(); }
+  drawLogo(W / 2, 540, 1100 * lerp(2.4, 1, eOut(k)) * (1 + 0.02 * Math.sin(lt * 15.7)), cl(k * 5), 40);
 }]);
 
 // Vehicle wraps: cutout vans drive through on every 2 beats, then two full layouts
@@ -215,7 +207,7 @@ section('BRANDED APPAREL', 38, 50);
 const POLOS = [
   ['polo-yardheros-front', 'polo-yardheros-back', '#e0602a'], ['polo-apex-front', 'polo-apex-back', '#e23b2a'],
   ['polo-amptheory-front', 'polo-amptheory-back', '#39d353'], ['polo-mammoth-front', 'polo-mammoth-back', '#4a76c9'],
-  ['polo-svac-front', 'polo-svac-back', '#2fae78'], [null, 'polo-levelup-back', '#5cbf4a'],
+  ['polo-svac-front', 'polo-svac-back', '#2fae78'], ['polo-levelup-front', 'polo-levelup-back', '#5cbf4a'],
 ];
 POLOS.forEach(([front, back, tint], i) => {
   SHOTS.push([38 + i * 2, 40 + i * 2, (lt, d, t) => {
