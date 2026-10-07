@@ -1,0 +1,244 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Monsta Puzzle Logo</title>
+<style>
+  @font-face { font-family: "Anton"; src: url("../assets/fonts/Anton.woff2") format("woff2"); }
+  @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; background: #070f22; overflow: hidden; }
+  canvas { display: block; }
+</style>
+<script src="moves.js"></script>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Monsta sliding-puzzle logo sting — 1920x1080. render(t) draws video time t.
+// The logo image is only ever cut into tiles and drawn unscaled relative to
+// itself; after the lock the untouched original image is shown.
+const W = 1920, H = 1080;
+const Z = window.PUZZLE, DURATION = Z.duration, LOCK = Z.lock;
+const RED = '#e11d26', NAVY = '#0b1730', DEEP = '#050c1c', PLATE = '#14254b';
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIn = x => x * x * x;
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eSnap = x => x < 1 ? 1 - Math.pow(1 - x, 4) * (1 - x * 0.0) : 1; // fast in, hard stop
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const logo = new Image(); logo.src = '../assets/img/monsta-logo.png';
+const LW = 1500, LH = 1500 * 484 / 1600;          // logo display size
+const CX = W / 2, CY = 450;                       // board centre
+const TW = LW / Z.cols, TH = LH / Z.rows, GAP = 10;
+
+// slot -> screen rect (with gaps while puzzling, gap -> 0 at the lock)
+function slotPos(slot, gap) {
+  const r = Math.floor(slot / Z.cols), c = slot % Z.cols;
+  const bw = LW + gap * (Z.cols - 1), bh = LH + gap * (Z.rows - 1);
+  return [CX - bw / 2 + c * (TW + gap), CY - bh / 2 + r * (TH + gap)];
+}
+
+// piece positions over time
+function pieceState(t) {
+  const pos = Z.start.slice();               // slot -> tile
+  const where = {};                           // tile -> [x,y,vx,vy,settle]
+  const moving = new Map();
+  for (const m of Z.moves) {
+    if (t >= m.t1) { pos[m.dst] = pos[m.src]; pos[m.src] = null; continue; }
+    if (t >= m.t0) moving.set(pos[m.src], m);
+    break;
+  }
+  return { pos, moving };
+}
+
+function drawTile(tile, x, y, plateA, blurDX = 0, blurDY = 0, alpha = 1) {
+  const r = Math.floor(tile / Z.cols), c = tile % Z.cols;
+  const sx = c * 1600 / Z.cols, sy = r * 484 / Z.rows, sw = 1600 / Z.cols, sh = 484 / Z.rows;
+  const ghosts = Math.hypot(blurDX, blurDY) > 2 ? 4 : 0;
+  for (let g = ghosts; g >= 0; g--) {
+    const gx = x - blurDX * g / 4, gy = y - blurDY * g / 4;
+    ctx.save(); ctx.globalAlpha = alpha * (g ? 0.16 : 1);
+    if (plateA > 0) {
+      ctx.save(); ctx.globalAlpha *= plateA;
+      if (!g) { ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10; }
+      ctx.fillStyle = PLATE; ctx.beginPath(); ctx.roundRect(gx, gy, TW, TH, 12); ctx.fill();
+      ctx.restore();
+      if (!g) {
+        ctx.save(); ctx.globalAlpha *= plateA;
+        const hl = ctx.createLinearGradient(0, gy, 0, gy + TH);
+        hl.addColorStop(0, 'rgba(255,255,255,0.10)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = hl; ctx.beginPath(); ctx.roundRect(gx, gy, TW, TH, 12); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+      }
+    }
+    ctx.save();
+    if (plateA > 0) { ctx.beginPath(); ctx.roundRect(gx, gy, TW, TH, 12 * plateA); ctx.clip(); }
+    ctx.drawImage(logo, sx, sy, sw, sh, gx, gy, TW, TH);
+    ctx.restore();
+    ctx.restore();
+  }
+}
+
+// ---------- background ----------
+const PARTS = (() => { const r = rng(5); return Array.from({ length: 60 }, () => ({ x: r() * W, y: r() * H, v: 15 + r() * 45, s: 1 + r() * 2.5, a: 0.1 + r() * 0.35, red: r() < 0.5, ph: r() * 6.28 })); })();
+function background(t, energy) {
+  ctx.fillStyle = '#070f22'; ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(CX, CY, 40, CX, CY, 1100);
+  g.addColorStop(0, `rgba(30,55,110,${0.55 + 0.25 * energy})`); g.addColorStop(0.5, 'rgba(11,23,48,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const rg = ctx.createRadialGradient(CX, CY, 20, CX, CY, 900);
+  rg.addColorStop(0, `rgba(225,29,38,${0.08 + 0.32 * energy})`); rg.addColorStop(1, 'rgba(225,29,38,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  // faint grid floor lines
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.035)'; ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y <= H; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
+  for (const p of PARTS) {
+    const y = ((p.y - t * p.v * (1 + energy * 2)) % H + H) % H;
+    ctx.globalAlpha = p.a * (0.6 + 0.4 * Math.sin(t * 3 + p.ph)); ctx.fillStyle = p.red ? RED : '#fff';
+    ctx.beginPath(); ctx.arc(p.x + Math.sin(t + p.ph) * 15, y, p.s, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function vignette() {
+  const g = ctx.createRadialGradient(W / 2, H / 2, 500, W / 2, H / 2, 1250);
+  g.addColorStop(0, 'rgba(3,7,16,0)'); g.addColorStop(1, 'rgba(3,7,16,0.8)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function text(s, x, y, o = {}) {
+  const { size = 100, color = '#fff', alpha = 1, scale = 1, ls = 0, glow = 0 } = o;
+  if (alpha <= 0) return;
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(x, y); ctx.scale(scale, scale);
+  ctx.font = `400 ${size}px "Anton"`; ctx.letterSpacing = ls + 'px'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (glow) { ctx.shadowColor = color === '#fff' ? 'rgba(255,255,255,0.5)' : RED; ctx.shadowBlur = glow; }
+  ctx.fillStyle = color; ctx.fillText(s, ls / 2, 0); ctx.restore();
+}
+function measure(s, size, ls) { ctx.save(); ctx.font = `400 ${size}px "Anton"`; ctx.letterSpacing = ls + 'px'; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+
+const BURST = (() => { const r = rng(9); return Array.from({ length: 160 }, () => ({ a: r() * 6.283, sp: 300 + r() * 1100, s: 1.5 + r() * 4.5, red: r() < 0.65 })); })();
+
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const build = P(t, 2.0, LOCK - 2.0);
+  const lockK = P(t, LOCK, 0.6);
+  background(t, Math.max(build * 0.5, 1 - lockK * 0.4) * (t >= LOCK ? 1 : build));
+
+  // camera: slow push-in during the puzzle, settle after, small shake on the lock
+  const push = 1 + 0.035 * eIO(build);
+  let shx = 0, shy = 0;
+  const d = t - LOCK;
+  if (d > 0 && d < 0.6) { const a = 16 * Math.exp(-d * 8); shx = a * Math.sin(d * 75); shy = a * Math.cos(d * 60); }
+  for (const m of Z.moves) { const dd = t - m.t1; if (dd > 0 && dd < 0.15) { const a = 3 * Math.exp(-dd * 30); shy += a * Math.sin(dd * 120); } }
+  ctx.save(); ctx.translate(CX + shx, CY + shy); ctx.scale(push, push); ctx.translate(-CX, -CY);
+
+  if (t < LOCK) {
+    const intro = eOut(P(t, 0, 0.6));
+    const gap = GAP;
+    const { pos, moving } = pieceState(t);
+    // board tray
+    const [bx, by] = slotPos(0, gap);
+    ctx.save(); ctx.globalAlpha = 0.9 * intro;
+    ctx.fillStyle = 'rgba(3,8,20,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 22, by - 22, LW + gap * (Z.cols - 1) + 44, LH + gap * (Z.rows - 1) + 44, 22); ctx.fill();
+    ctx.strokeStyle = `rgba(225,29,38,${0.25 + 0.5 * build})`; ctx.lineWidth = 3; ctx.stroke();
+    // empty slot marker
+    const ex = pos.indexOf(null); const [sx, sy] = slotPos(ex, gap);
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.setLineDash([12, 10]); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(sx + 6, sy + 6, TW - 12, TH - 12, 10); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+    // pieces
+    for (let s = 0; s < pos.length; s++) {
+      const tile = pos[s]; if (tile === null || moving.has(tile)) continue;
+      // tiny settle bounce right after a tile lands
+      const m = Z.moves.find(mm => mm.dst === s && t >= mm.t1 && t - mm.t1 < 0.12);
+      const bounce = m ? Math.sin((t - m.t1) / 0.12 * Math.PI) * 4 : 0;
+      const [x, y] = slotPos(s, gap);
+      // opening: pieces drift up into place
+      drawTile(tile, x, y + (1 - intro) * 40 + bounce, 1, 0, 0, intro);
+      if (m) { ctx.save(); ctx.globalAlpha = 0.6 * (1 - (t - m.t1) / 0.12); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x, y, TW, TH, 12); ctx.stroke(); ctx.restore(); }
+    }
+    for (const [tile, m] of moving) {
+      const k = (t - m.t0) / (m.t1 - m.t0);
+      const e = eIO(k);
+      const [ax, ay] = slotPos(m.src, gap), [bx2, by2] = slotPos(m.dst, gap);
+      const v = (eIO(Math.min(1, k + 0.08)) - e);
+      drawTile(tile, lerp(ax, bx2, e), lerp(ay, by2, e), 1, (bx2 - ax) * v * 1.4, (by2 - ay) * v * 1.4);
+    }
+    // the missing piece flies in last
+    if (t >= Z.finalStart) {
+      const k = P(t, Z.finalStart, LOCK - Z.finalStart);
+      const e = eIn(k);
+      const [fx, fy] = slotPos(Z.cols * Z.rows - 1, gap);
+      const x = lerp(W + 300, fx, e);
+      drawTile(Z.cols * Z.rows - 1, x, fy, 1, 260 * k, 0);
+    }
+  } else {
+    // locked: gaps close, plates fade, the untouched original logo takes over
+    const close = eOut(P(t, LOCK, 0.18));
+    const gap = GAP * (1 - close);
+    const plateA = 1 - P(t, LOCK, 0.35);
+    const pop = 1 + 0.06 * Math.sin(Math.PI * P(t, LOCK, 0.45)) + 0.03 * eOut(P(t, LOCK + 0.3, 1.5));
+    ctx.save(); ctx.translate(CX, CY); ctx.scale(pop, pop); ctx.translate(-CX, -CY);
+    if (plateA > 0) for (let s = 0; s < Z.cols * Z.rows; s++) { const [x, y] = slotPos(s, gap); drawTile(s, x, y, plateA); }
+    else {
+      const glow = 20 + 40 * Math.exp(-(t - LOCK) * 2) + 8 * Math.sin((t - LOCK) * 3);
+      ctx.save(); ctx.shadowColor = 'rgba(225,29,38,0.9)'; ctx.shadowBlur = glow;
+      ctx.drawImage(logo, CX - LW / 2, CY - LH / 2, LW, LH); ctx.restore();
+    }
+    ctx.restore();
+    // energy pulse ring + burst
+    const kr = P(t, LOCK, 0.9);
+    if (kr < 1) {
+      ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - kr)})`; ctx.lineWidth = 14 * (1 - kr) + 1;
+      ctx.beginPath(); ctx.ellipse(CX, CY, 780 + 700 * eOut(kr), 260 + 380 * eOut(kr), 0, 0, 7); ctx.stroke();
+      ctx.strokeStyle = `rgba(225,29,38,${0.7 * (1 - kr)})`; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.ellipse(CX, CY, 760 + 450 * eOut(kr), 250 + 250 * eOut(kr), 0, 0, 7); ctx.stroke(); ctx.restore();
+    }
+    const bt = t - LOCK;
+    for (const b of BURST) {
+      const dd = b.sp * (1 - Math.exp(-bt * 1.8));
+      ctx.globalAlpha = cl(1 - bt / 3) * 0.9; ctx.fillStyle = b.red ? RED : '#fff';
+      ctx.beginPath(); ctx.arc(CX + Math.cos(b.a) * dd * 1.3, CY + Math.sin(b.a) * dd * 0.6, b.s, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+
+  // tagline, word by word on the VO
+  const words = [['BRANDING', '#fff'], ['THAT', '#fff'], ['EATS', RED], ['THE', '#fff'], ['COMPETITION', RED]];
+  const size = 104, ls = 6, gapW = 30;
+  const ws = words.map(w => measure(w[0], size, ls));
+  let x = W / 2 - (ws.reduce((a, b) => a + b, 0) + gapW * (words.length - 1)) / 2;
+  words.forEach(([s, col], i) => {
+    const k = P(t, Z.wordHits[i] - 0.04, 0.22);
+    if (k > 0) {
+      const y = 845;
+      ctx.save(); ctx.beginPath(); ctx.rect(x - 20, y - 90, ws[i] + 40, 180); ctx.clip();
+      text(s, x + ws[i] / 2, y + (1 - eOut(k)) * 120, { size, ls, color: col, glow: col === RED ? 18 : 0 });
+      ctx.restore();
+    }
+    x += ws[i] + gapW;
+  });
+  const lw = 1180 * eOut(P(t, Z.wordHits[4] + 0.25, 0.5));
+  if (lw > 0) { ctx.fillStyle = RED; ctx.fillRect(W / 2 - lw / 2, 920, lw, 8); }
+
+  // flash on the lock
+  const fk = P(t, LOCK, 0.3);
+  if (fk > 0 && fk < 1) { ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - fk)})`; ctx.fillRect(0, 0, W, H); }
+  vignette();
+  const fi = 1 - P(t, 0, 0.4); if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
+  const fo = P(t, DURATION - 0.5, 0.5); if (fo > 0) { ctx.fillStyle = `rgba(3,7,16,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.DURATION = DURATION;
+window.ready = Promise.all([document.fonts.load('400 100px "Anton"'), new Promise(r => logo.complete ? r() : (logo.onload = r))]).then(() => { render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
