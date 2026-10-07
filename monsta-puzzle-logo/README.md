@@ -1,6 +1,7 @@
 # Monsta Puzzle Logo sting
 
 `monsta-puzzle-logo.mp4`: 1920x1080, 30fps, 14.5s, H.264 + AAC (-16 LUFS).
+`monsta-puzzle-logo-vertical.mp4`: 1080x1920 Reels version (same timing and audio; tagline on three lines).
 
 | Time | What happens |
 |---|---|
@@ -20,4 +21,8 @@ Music: "Punchier 808 Bass" from 8.89s, so its bass drop (16.09s in the song) lan
 python3 src/build_puzzle.py                     # moves + sfx
 node src/render.mjs build/video_only.mp4 30     # frames via Playwright/Chromium -> ffmpeg
 GAIN=1.5dB ./src/mix.sh                         # music + sfx + VO -> monsta-puzzle-logo.mp4
+
+# vertical / Reels
+node src/render.mjs --vertical build/video_only_vertical.mp4 30
+GAIN=1.5dB VIDEO=build/video_only_vertical.mp4 OUT=monsta-puzzle-logo-vertical.mp4 ./src/mix.sh
 ```

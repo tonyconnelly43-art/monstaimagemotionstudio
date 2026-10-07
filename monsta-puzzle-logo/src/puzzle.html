@@ -17,10 +17,13 @@
 // Monsta sliding-puzzle logo sting — 1920x1080. render(t) draws video time t.
 // The logo image is only ever cut into tiles and drawn unscaled relative to
 // itself; after the lock the untouched original image is shown.
-const W = 1920, H = 1080;
+// puzzle.html?vertical renders the 1080x1920 Reels version
+const V = location.search.includes('vertical');
+const W = V ? 1080 : 1920, H = V ? 1920 : 1080;
 const Z = window.PUZZLE, DURATION = Z.duration, LOCK = Z.lock;
 const RED = '#e11d26', NAVY = '#0b1730', DEEP = '#050c1c', PLATE = '#14254b';
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+cv.width = W; cv.height = H;
 
 const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const P = (t, s, d) => cl((t - s) / d);
@@ -32,8 +35,9 @@ const eSnap = x => x < 1 ? 1 - Math.pow(1 - x, 4) * (1 - x * 0.0) : 1; // fast i
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 const logo = new Image(); logo.src = '../assets/img/monsta-logo.png';
-const LW = 1500, LH = 1500 * 484 / 1600;          // logo display size
-const CX = W / 2, CY = 450;                       // board centre
+const LW = V ? 930 : 1500, LH = LW * 484 / 1600;
+const K = LW / 1500;                              // effect scale          // logo display size
+const CX = W / 2, CY = V ? 760 : 450;                       // board centre
 const TW = LW / Z.cols, TH = LH / Z.rows, GAP = 10;
 
 // slot -> screen rect (with gaps while puzzling, gap -> 0 at the lock)
@@ -108,7 +112,7 @@ function background(t, energy) {
   ctx.globalAlpha = 1;
 }
 function vignette() {
-  const g = ctx.createRadialGradient(W / 2, H / 2, 500, W / 2, H / 2, 1250);
+  const g = ctx.createRadialGradient(W / 2, H / 2, V ? 450 : 500, W / 2, H / 2, V ? 1300 : 1250);
   g.addColorStop(0, 'rgba(3,7,16,0)'); g.addColorStop(1, 'rgba(3,7,16,0.8)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
@@ -196,15 +200,15 @@ function render(t) {
     const kr = P(t, LOCK, 0.9);
     if (kr < 1) {
       ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - kr)})`; ctx.lineWidth = 14 * (1 - kr) + 1;
-      ctx.beginPath(); ctx.ellipse(CX, CY, 780 + 700 * eOut(kr), 260 + 380 * eOut(kr), 0, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(CX, CY, K * (780 + 700 * eOut(kr)), K * (260 + 380 * eOut(kr)) * (V ? 1.6 : 1), 0, 0, 7); ctx.stroke();
       ctx.strokeStyle = `rgba(225,29,38,${0.7 * (1 - kr)})`; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.ellipse(CX, CY, 760 + 450 * eOut(kr), 250 + 250 * eOut(kr), 0, 0, 7); ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.ellipse(CX, CY, K * (760 + 450 * eOut(kr)), K * (250 + 250 * eOut(kr)) * (V ? 1.6 : 1), 0, 0, 7); ctx.stroke(); ctx.restore();
     }
     const bt = t - LOCK;
     for (const b of BURST) {
       const dd = b.sp * (1 - Math.exp(-bt * 1.8));
       ctx.globalAlpha = cl(1 - bt / 3) * 0.9; ctx.fillStyle = b.red ? RED : '#fff';
-      ctx.beginPath(); ctx.arc(CX + Math.cos(b.a) * dd * 1.3, CY + Math.sin(b.a) * dd * 0.6, b.s, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(CX + Math.cos(b.a) * dd * 1.3, CY + Math.sin(b.a) * dd * (V ? 1.3 : 0.6), b.s, 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -212,21 +216,26 @@ function render(t) {
 
   // tagline, word by word on the VO
   const words = [['BRANDING', '#fff'], ['THAT', '#fff'], ['EATS', RED], ['THE', '#fff'], ['COMPETITION', RED]];
-  const size = 104, ls = 6, gapW = 30;
+  const size = V ? 132 : 104, ls = 6, gapW = 30;
   const ws = words.map(w => measure(w[0], size, ls));
-  let x = W / 2 - (ws.reduce((a, b) => a + b, 0) + gapW * (words.length - 1)) / 2;
-  words.forEach(([s, col], i) => {
-    const k = P(t, Z.wordHits[i] - 0.04, 0.22);
-    if (k > 0) {
-      const y = 845;
-      ctx.save(); ctx.beginPath(); ctx.rect(x - 20, y - 90, ws[i] + 40, 180); ctx.clip();
-      text(s, x + ws[i] / 2, y + (1 - eOut(k)) * 120, { size, ls, color: col, glow: col === RED ? 18 : 0 });
-      ctx.restore();
+  const lines = V ? [[0, 1], [2, 3], [4]] : [[0, 1, 2, 3, 4]];
+  const lineY = V ? [1120, 1265, 1410] : [845];
+  lines.forEach((idx, li) => {
+    let x = W / 2 - (idx.reduce((a, i) => a + ws[i], 0) + gapW * (idx.length - 1)) / 2;
+    for (const i of idx) {
+      const [s, col] = words[i];
+      const k = P(t, Z.wordHits[i] - 0.04, 0.22);
+      if (k > 0) {
+        const y = lineY[li];
+        ctx.save(); ctx.beginPath(); ctx.rect(x - 20, y - 95, ws[i] + 40, 190); ctx.clip();
+        text(s, x + ws[i] / 2, y + (1 - eOut(k)) * 130, { size, ls, color: col, glow: col === RED ? 18 : 0 });
+        ctx.restore();
+      }
+      x += ws[i] + gapW;
     }
-    x += ws[i] + gapW;
   });
-  const lw = 1180 * eOut(P(t, Z.wordHits[4] + 0.25, 0.5));
-  if (lw > 0) { ctx.fillStyle = RED; ctx.fillRect(W / 2 - lw / 2, 920, lw, 8); }
+  const lw = (V ? 760 : 1180) * eOut(P(t, Z.wordHits[4] + 0.25, 0.5));
+  if (lw > 0) { ctx.fillStyle = RED; ctx.fillRect(W / 2 - lw / 2, V ? 1510 : 920, lw, 8); }
 
   // flash on the lock
   const fk = P(t, LOCK, 0.3);

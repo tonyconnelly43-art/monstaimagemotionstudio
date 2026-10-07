@@ -1,5 +1,5 @@
 // Renders src/puzzle.html frame-by-frame and pipes PNGs into ffmpeg.
-// Usage: node src/render.mjs <out.mp4> [fps]         full video (no audio)
+// Usage: node src/render.mjs [--vertical] <out.mp4> [fps]         full video (no audio)
 //        node src/render.mjs --stills <dir> t1 t2 ...  preview frames
 import { createRequire } from 'module';
 import { spawn } from 'child_process';
@@ -10,10 +10,11 @@ let playwright;
 try { playwright = require('playwright'); } catch { playwright = require('/opt/node22/lib/node_modules/playwright'); }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const args = process.argv.slice(2);
+let args = process.argv.slice(2);
+const vertical = args.includes('--vertical'); args = args.filter(a => a !== '--vertical');
 const browser = await playwright.chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-await page.goto('file://' + path.join(here, 'puzzle.html'));
+const page = await browser.newPage({ viewport: vertical ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+await page.goto('file://' + path.join(here, 'puzzle.html') + (vertical ? '?vertical' : ''));
 await page.evaluate(() => window.ready);
 const canvas = await page.$('canvas');
 
