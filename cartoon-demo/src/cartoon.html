@@ -1,0 +1,307 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cartoon Demo</title>
+<style>
+  @font-face { font-family: "Anton"; src: url("../assets/fonts/Anton.woff2") format("woff2"); }
+  @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; background: #0b1730; overflow: hidden; }
+  canvas { display: block; }
+</style>
+<script src="lipsync.js"></script>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Cut-out cartoon demo, 1080x1920. A stand-in monster puppet is drawn from parts
+// (body, eyes, lids, brows, mouth shapes, arms, feet) and driven by a rig(t).
+// Mouth shapes come from the voiceover (src/lipsync.js); VO starts at VO_AT.
+const W = 1080, H = 1920, DURATION = 8.6, VO_AT = 0.8;
+const RED = '#e11d26', DARK = '#2a0507', BODY = '#d41f2a', BODY_DK = '#8e0b12', CREAM = '#fff1d6';
+const ctx = document.getElementById('c').getContext('2d');
+const L = window.LIP;
+
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIn = x => x * x * x;
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 2.2, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const spring = (x, f = 3, d = 5) => x <= 0 ? 0 : 1 - Math.exp(-d * x) * Math.cos(f * Math.PI * 2 * x);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const logo = new Image(); logo.src = '../assets/monsta-logo.png';
+
+// ---------- voice helpers ----------
+function lipAt(t) {
+  const i = Math.floor((t - VO_AT) * L.fps);
+  if (i < 0 || i >= L.shapes.length) return { shape: 'X', e: 0 };
+  return { shape: L.shapes[i], e: L.energy[i] };
+}
+function energySmooth(t) { let s = 0; for (let k = -3; k <= 3; k++) s += lipAt(t + k / 30).e; return s / 7; }
+const VT = s => VO_AT + s; // VO-relative cue -> video time
+
+// ---------- rig ----------
+// keyframe helper: piecewise eased tween list [[t, value], ...]
+function track(t, keys, ease = eIO) {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [a, va] = keys[i], [b, vb] = keys[i + 1];
+    if (t <= b) return lerp(va, vb, ease((t - a) / (b - a)));
+  }
+  return keys[keys.length - 1][1];
+}
+function rig(t) {
+  const r = {};
+  const en = energySmooth(t);
+  // drop-in, land squash, settle
+  const fall = P(t, 0, 0.5);
+  r.y = t < 0.5 ? lerp(-1500, 0, eIn(fall)) : 0;
+  let squash = 0;
+  if (t >= 0.5) squash += 0.28 * Math.exp(-(t - 0.5) * 7) * Math.cos((t - 0.5) * 22);
+  if (t < 0.5) squash -= 0.18 * fall;                       // stretched while falling
+  // jump at the end of the line
+  const J0 = 5.05, J1 = 5.75;
+  if (t > J0 - 0.2 && t < J0) squash += 0.22 * Math.sin(P(t, J0 - 0.2, 0.2) * Math.PI / 2); // anticipation crouch
+  if (t >= J0 && t < J1) { const k = (t - J0) / (J1 - J0); r.y = -520 * 4 * k * (1 - k); squash -= 0.16 * Math.sin(k * Math.PI); }
+  if (t >= J1) squash += 0.3 * Math.exp(-(t - J1) * 7) * Math.cos((t - J1) * 22);
+  r.squash = squash;
+  // talking: head bob + lean from voice energy, idle breathing otherwise
+  r.bob = Math.sin(t * 2.2) * 6 + en * 18 * Math.sin(t * 13);
+  r.lean = track(t, [[0, 0], [VT(1.2), 0.02], [VT(1.6), -0.05], [VT(2.1), 0], [VT(2.4), 0.06], [VT(3.2), 0.08], [VT(3.5), -0.03], [5.0, 0]]) + en * 0.02 * Math.sin(t * 7);
+  // eyes
+  const blinks = [0.95, 2.4, 3.05, 4.4, 6.3, 7.4];
+  r.blink = Math.max(...blinks.map(b => { const d = Math.abs(t - b); return d < 0.09 ? 1 - d / 0.09 : 0; }));
+  if (t < 0.55) r.blink = 0;
+  r.lookX = track(t, [[0, 0], [VT(1.3), 0], [VT(1.5), 0.8], [VT(1.9), 0.8], [VT(2.1), 0], [7, 0]]);
+  r.lookY = track(t, [[0, -0.5], [0.6, 0.2], [1.0, 0], [7, 0]]);
+  // brows: -1 angry .. +1 raised
+  r.brow = track(t, [[0, 0.6], [0.8, 0], [VT(1.45), 0], [VT(1.65), 1], [VT(2.0), 0.3], [VT(3.2), 0.2], [VT(3.35), -0.9], [VT(3.95), -0.9], [5.0, 0.8], [6, 0.4]]);
+  // mouth
+  const lip = lipAt(t);
+  r.mouth = lip.shape;
+  r.grin = t > VT(3.95) ? P(t, VT(3.95), 0.25) : (t < VO_AT ? 1 : 0);
+  // arms: [shoulder angle, elbow bend] in radians (0 = straight down)
+  const L0 = [0.35, 0.25], R0 = [-0.35, -0.25];
+  const wave = Math.sin(t * 16) * 0.35;
+  r.armL = [
+    track(t, [[0, 2.3], [0.55, 2.4], [0.9, L0[0]], [VT(2.4), L0[0]], [VT(2.6), 2.0], [VT(3.3), 2.2], [VT(3.45), 2.6], [VT(3.95), 2.6], [5.4, 2.7], [6.0, 0.6]], eIO),
+    track(t, [[0, 0.5], [0.9, L0[1]], [VT(2.4), L0[1]], [VT(2.6), 1.0], [VT(3.45), 1.0], [VT(3.95), 0.8], [6.0, 0.3]])];
+  r.armR = [
+    track(t, [[0, -2.3], [0.55, -2.4], [0.9, R0[0]], [VT(1.2), R0[0]], [VT(1.45), -1.6], [VT(1.95), -1.6], [VT(2.2), R0[0]], [VT(2.6), -2.0], [VT(3.3), -2.2], [VT(3.45), -2.6], [VT(3.95), -2.6], [5.4, -2.7], [6.0, -2.1], [7.6, -2.1]], eIO),
+    track(t, [[0, -0.5], [0.9, R0[1]], [VT(1.45), -0.1], [VT(1.95), -0.1], [VT(2.2), R0[1]], [VT(2.6), -1.0], [VT(3.45), -1.0], [VT(3.95), -0.8], [6.0, -1.2]])];
+  if (t > 6.0) r.armR[1] += wave;                               // wave goodbye
+  if (t > VT(3.45) && t < VT(3.95)) { r.armL[0] += Math.sin(t * 30) * 0.08; r.armR[0] -= Math.sin(t * 30) * 0.08; } // fist shake
+  r.fist = t > VT(2.5) && t < 5.6;
+  r.point = t > VT(1.4) && t < VT(2.0);
+  return r;
+}
+
+// ---------- puppet drawing ----------
+const FUR = (() => { const g = rng(3); return Array.from({ length: 40 }, () => 0.85 + g() * 0.3); })();
+function furBlob(cx, cy, rx, ry, t, wob = 1) {
+  ctx.beginPath();
+  const n = FUR.length;
+  for (let i = 0; i <= n; i++) {
+    const a = i / n * Math.PI * 2, a2 = (i + 0.5) / n * Math.PI * 2;
+    const k = FUR[i % n] + 0.02 * Math.sin(t * 6 + i) * wob;
+    const x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+    const tx = cx + Math.cos(a2) * rx * (1 + 0.09 * k), ty = cy + Math.sin(a2) * ry * (1 + 0.09 * k);
+    if (i === 0) ctx.moveTo(x, y); else ctx.quadraticCurveTo(px, py, x, y);
+    var px = tx, py = ty;
+  }
+  ctx.closePath();
+}
+function arm(sx, sy, ang, bend, side, fist, point, t) {
+  const l1 = 140, l2 = 125;
+  const ex = sx - Math.sin(ang) * l1, ey = sy + Math.cos(ang) * l1;   // positive angle swings toward screen-left
+  const a2 = ang + bend;
+  const hx = ex - Math.sin(a2) * l2, hy = ey + Math.cos(a2) * l2;
+  for (const [w, c] of [[64, DARK], [46, BODY]]) {
+    ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(ex, ey, hx, hy); ctx.stroke();
+  }
+  // hand
+  ctx.save(); ctx.translate(hx, hy); ctx.rotate(a2);
+  ctx.fillStyle = BODY; ctx.strokeStyle = DARK; ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.arc(0, 10, fist ? 40 : 36, 0, 7); ctx.fill(); ctx.stroke();
+  if (!fist) for (const fx of [-24, 0, 24]) {
+    const len = point && fx === 0 ? 62 : 34;
+    ctx.beginPath(); ctx.ellipse(fx, 40 + len / 3, 15, len / 2 + 4, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = CREAM; ctx.beginPath(); ctx.moveTo(fx - 7, 40 + len * 0.8); ctx.lineTo(fx, 40 + len * 0.8 + 20); ctx.lineTo(fx + 7, 40 + len * 0.8); ctx.fill(); ctx.fillStyle = BODY;
+  } else { ctx.strokeStyle = BODY_DK; ctx.lineWidth = 5; for (const fx of [-14, 6]) { ctx.beginPath(); ctx.moveTo(fx, 0); ctx.lineTo(fx, 30); ctx.stroke(); } }
+  ctx.restore();
+}
+function mouth(shape, grin, x, y) {
+  const S = { X: [170, 0], B: [130, 46], E: [200, 66], A: [175, 130], O: [96, 104] }[shape] || [170, 0];
+  let [mw, mh] = S;
+  ctx.save(); ctx.translate(x, y);
+  if (mh < 5) {
+    // closed: smile line (bigger grin when grin=1)
+    const cur = 26 + grin * 40;
+    ctx.strokeStyle = DARK; ctx.lineWidth = 12; ctx.lineCap = 'round';
+    if (grin > 0.5) {
+      ctx.fillStyle = '#3a0508'; ctx.beginPath(); ctx.moveTo(-mw / 2 - 10, -6); ctx.quadraticCurveTo(0, cur * 2.3, mw / 2 + 10, -6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-45, -2); ctx.lineTo(-30, 26); ctx.lineTo(-15, -2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(45, -2); ctx.lineTo(30, 26); ctx.lineTo(15, -2); ctx.fill();
+    } else { ctx.beginPath(); ctx.moveTo(-mw / 2, 0); ctx.quadraticCurveTo(0, cur, mw / 2, 0); ctx.stroke(); }
+    ctx.restore(); return;
+  }
+  ctx.fillStyle = '#3a0508'; ctx.strokeStyle = DARK; ctx.lineWidth = 12;
+  ctx.beginPath();
+  if (shape === 'O') ctx.ellipse(0, mh / 2 - 10, mw / 2, mh / 2, 0, 0, 7);
+  else { ctx.moveTo(-mw / 2, 0); ctx.quadraticCurveTo(0, -mh * 0.25, mw / 2, 0); ctx.quadraticCurveTo(mw * 0.42, mh * 1.05, 0, mh); ctx.quadraticCurveTo(-mw * 0.42, mh * 1.05, -mw / 2, 0); }
+  ctx.fill();
+  ctx.save(); ctx.clip();
+  if (mh > 50) { ctx.fillStyle = '#ff6f8a'; ctx.beginPath(); ctx.ellipse(0, mh * 0.95, mw * 0.32, mh * 0.35, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#fff';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * mw * 0.32, -10); ctx.lineTo(s * mw * 0.2, Math.min(34, mh * 0.45)); ctx.lineTo(s * mw * 0.1, -10); ctx.fill(); }
+  ctx.restore();
+  ctx.stroke();
+  ctx.restore();
+}
+function eye(x, y, r, t) {
+  const ex = 72, ey = 84;
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = DARK; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.ellipse(x, y, ex, ey, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.ellipse(x, y, ex, ey, 0, 0, 7); ctx.clip();
+  const px = x + r.lookX * 28, py = y + 8 + r.lookY * 26;
+  ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.arc(px, py, 34, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px + 12, py - 14, 11, 0, 7); ctx.fill();
+  // eyelid
+  if (r.blink > 0) { ctx.fillStyle = BODY; ctx.fillRect(x - ex, y - ey, ex * 2, ey * 2 * r.blink); ctx.strokeStyle = DARK; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x - ex, y - ey + ey * 2 * r.blink); ctx.lineTo(x + ex, y - ey + ey * 2 * r.blink); ctx.stroke(); }
+  ctx.restore();
+  ctx.strokeStyle = DARK; ctx.lineWidth = 10; ctx.beginPath(); ctx.ellipse(x, y, ex, ey, 0, 0, 7); ctx.stroke();
+}
+function brow(x, y, side, b) {
+  ctx.save(); ctx.translate(x, y - 108 - Math.max(0, b) * 26); ctx.rotate(side * (b < 0 ? b * 0.38 : -b * 0.12));   // b<0: inner ends down (angry)
+  ctx.strokeStyle = DARK; ctx.lineWidth = 22; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-50, 6); ctx.quadraticCurveTo(0, -12, 50, 6); ctx.stroke(); ctx.restore();
+}
+function drawMonster(r, t) {
+  const sx = 1 + r.squash, sy = 1 - r.squash;
+  ctx.save(); ctx.scale(sx, sy); ctx.rotate(r.lean);
+  const by = -330 + r.bob * 0.4;
+  // feet
+  ctx.fillStyle = BODY_DK; ctx.strokeStyle = DARK; ctx.lineWidth = 10;
+  for (const fx of [-95, 95]) { ctx.beginPath(); ctx.ellipse(fx, -26, 92, 42, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = CREAM; for (const c of [-40, 0, 40]) { ctx.beginPath(); ctx.moveTo(fx + c - 10, -60); ctx.lineTo(fx + c, -80); ctx.lineTo(fx + c + 10, -60); ctx.fill(); } ctx.fillStyle = BODY_DK; }
+  // back arm layer
+  arm(-235, by + 10, r.armL[0], r.armL[1], -1, r.fist, false, t);
+  // horns
+  ctx.fillStyle = CREAM; ctx.strokeStyle = DARK; ctx.lineWidth = 10;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 110, by - 250); ctx.quadraticCurveTo(s * 190, by - 330, s * 175, by - 400); ctx.quadraticCurveTo(s * 160, by - 320, s * 60, by - 268); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  // body
+  const g = ctx.createRadialGradient(-80, by - 120, 40, 0, by, 330);
+  g.addColorStop(0, '#ff4a52'); g.addColorStop(0.6, BODY); g.addColorStop(1, BODY_DK);
+  ctx.fillStyle = g; ctx.strokeStyle = DARK; ctx.lineWidth = 14;
+  furBlob(0, by, 270, 290, t); ctx.fill(); ctx.stroke();
+  // belly fur tufts
+  ctx.strokeStyle = 'rgba(255,140,140,0.35)'; ctx.lineWidth = 6;
+  for (let i = 0; i < 9; i++) { const a = -1.2 + i * 0.3; ctx.beginPath(); ctx.moveTo(Math.cos(a + 1.57) * 170, by + 110 + Math.sin(a) * 30); ctx.lineTo(Math.cos(a + 1.57) * 170 + 6, by + 140 + Math.sin(a) * 30); ctx.stroke(); }
+  // face
+  const fy = by - 60 + r.bob * 0.3;
+  eye(-92, fy - 40, r, t); eye(92, fy - 40, r, t);
+  brow(-92, fy - 40, -1, r.brow); brow(92, fy - 40, 1, r.brow);
+  mouth(r.mouth, r.grin, 0, fy + 105);
+  // front arm
+  arm(235, by + 10, r.armR[0], r.armR[1], 1, r.fist, r.point, t);
+  ctx.restore();
+}
+
+// ---------- scene ----------
+const DUST = (() => { const g = rng(11); return Array.from({ length: 40 }, () => ({ a: (g() - 0.5) * Math.PI * 0.9, sp: 200 + g() * 500, s: 6 + g() * 14 })); })();
+function scene(t) {
+  // backdrop
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0b1730'); g.addColorStop(0.62, '#1c2f5c'); g.addColorStop(0.63, '#14254b'); g.addColorStop(1, '#070f22');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // spotlight + rays
+  ctx.save(); ctx.translate(W / 2, -100);
+  for (let i = -5; i <= 5; i++) { ctx.rotate(0); const a = i * 0.11 + Math.sin(t * 0.6) * 0.02;
+    ctx.fillStyle = `rgba(255,255,255,${0.035})`; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.sin(a - 0.03) * 2400, Math.cos(a - 0.03) * 2400); ctx.lineTo(Math.sin(a + 0.03) * 2400, Math.cos(a + 0.03) * 2400); ctx.fill(); }
+  ctx.restore();
+  const sp = ctx.createRadialGradient(W / 2, 1450, 20, W / 2, 1450, 520);
+  sp.addColorStop(0, 'rgba(225,29,38,0.35)'); sp.addColorStop(1, 'rgba(225,29,38,0)');
+  ctx.fillStyle = sp; ctx.fillRect(0, 900, W, 1020);
+  // floor lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 2;
+  for (let i = -8; i <= 8; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 60, 1210); ctx.lineTo(W / 2 + i * 260, H); ctx.stroke(); }
+  for (let k = 0; k < 6; k++) { const y = 1210 + Math.pow(k / 5, 1.8) * 710; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+}
+
+const CHUNKS = [[0, 2], [2, 4], [4, 7], [7, 10], [10, 12], [12, 14]];
+function captions(t) {
+  const words = L.words;
+  const vt = t - VO_AT;
+  const ci = CHUNKS.findIndex(([a, b]) => vt >= words[a].t0 - 0.05 && vt < (b < words.length ? words[b].t0 - 0.05 : words[b - 1].t1 + 0.4));
+  if (ci < 0) return;
+  const [a, b] = CHUNKS[ci];
+  const k = P(vt, words[a].t0 - 0.05, 0.14);
+  const size = 104;
+  ctx.font = `400 ${size}px "Anton"`; ctx.letterSpacing = '2px';
+  const ws = []; for (let i = a; i < b; i++) ws.push(ctx.measureText(words[i].w.toUpperCase()).width);
+  const total = ws.reduce((x, y) => x + y, 0) + 28 * (ws.length - 1);
+  let x = W / 2 - total / 2;
+  ctx.save(); ctx.translate(W / 2, 470); ctx.scale(lerp(0.7, 1, eBack(k)), lerp(0.7, 1, eBack(k))); ctx.translate(-W / 2, -470);
+  for (let i = a; i < b; i++) {
+    const w = words[i].w.toUpperCase(), on = vt >= words[i].t0;
+    ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.lineWidth = 18; ctx.strokeStyle = '#000'; ctx.strokeText(w, x, 470);
+    ctx.fillStyle = on ? (vt < words[i].t1 + 0.05 ? '#ffd23f' : '#fff') : 'rgba(255,255,255,0.55)';
+    ctx.fillText(w, x, 470);
+    x += ws[i - a] + 28;
+  }
+  ctx.restore();
+}
+
+function endCard(t) {
+  const k = P(t, 6.6, 0.35);
+  if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha = k;
+  const w = 880 * lerp(1.4, 1, eOut(k));
+  ctx.shadowColor = 'rgba(225,29,38,0.8)'; ctx.shadowBlur = 30;
+  ctx.drawImage(logo, W / 2 - w / 2, 330 - w * 484 / 1600 / 2, w, w * 484 / 1600);
+  ctx.shadowBlur = 0;
+  ctx.font = '400 64px "Anton"'; ctx.letterSpacing = '6px'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 12; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round';
+  const kk = P(t, 6.85, 0.3);
+  ctx.globalAlpha = kk; ctx.strokeText('CARTOON ANIMATION', W / 2 + 3, 560 + (1 - eOut(kk)) * 40); ctx.fillStyle = '#fff'; ctx.fillText('CARTOON ANIMATION', W / 2 + 3, 560 + (1 - eOut(kk)) * 40);
+  ctx.restore();
+}
+
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.letterSpacing = '0px'; ctx.textAlign = 'left';
+  scene(t);
+  const r = rig(t);
+  // camera: punch-ins on the beats of the line, shake on "can't ignore" and landings
+  const zoom = track(t, [[0, 1], [VT(2.33), 1], [VT(2.4), 1.12], [VT(3.4), 1.14], [VT(3.48), 1.3], [VT(3.95), 1.32], [5.0, 1.0], [8.6, 1.0]], eOut);
+  let shx = 0, shy = 0;
+  for (const [ti, amp] of [[0.5, 24], [VT(3.48), 18], [5.75, 22]]) { const d = t - ti; if (d > 0 && d < 0.5) { const a = amp * Math.exp(-d * 9); shx += a * Math.sin(d * 80); shy += a * Math.cos(d * 66); } }
+  const focusY = lerp(1150, 1000, cl((zoom - 1) / 0.3));
+  ctx.save(); ctx.translate(W / 2 + shx, focusY + shy); ctx.scale(zoom, zoom); ctx.translate(-W / 2, -focusY);
+  // ground shadow (shrinks while airborne)
+  const air = cl(-r.y / 520);
+  ctx.fillStyle = `rgba(0,0,0,${0.45 * (1 - air * 0.6)})`; ctx.beginPath(); ctx.ellipse(W / 2, 1450, 300 * (1 - air * 0.4) * (1 + r.squash), 46 * (1 - air * 0.4), 0, 0, 7); ctx.fill();
+  // landing dust
+  for (const T of [0.5, 5.75]) { const d = t - T; if (d > 0 && d < 0.7) for (const p of DUST) { ctx.globalAlpha = 0.5 * (1 - d / 0.7); ctx.fillStyle = '#c9d3ea'; const dist = p.sp * eOut(d / 0.7); ctx.beginPath(); ctx.arc(W / 2 + Math.sin(p.a) * (280 + dist), 1440 - Math.abs(Math.cos(p.a)) * dist * 0.25, p.s * (1 - d / 0.7 * 0.5), 0, 7); ctx.fill(); } ctx.globalAlpha = 1; }
+  ctx.save(); ctx.translate(W / 2, 1450 + r.y); drawMonster(r, t); ctx.restore();
+  // motion lines while falling / jumping
+  if (t < 0.5 || (t > 5.05 && t < 5.4)) { ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 6; for (const x of [-200, -60, 80, 210]) { ctx.beginPath(); ctx.moveTo(W / 2 + x, 1450 + r.y - 800); ctx.lineTo(W / 2 + x, 1450 + r.y - 1000); ctx.stroke(); } }
+  ctx.restore();
+  captions(t);
+  endCard(t);
+  // vignette + fades
+  const v = ctx.createRadialGradient(W / 2, H / 2, 600, W / 2, H / 2, 1300);
+  v.addColorStop(0, 'rgba(3,7,16,0)'); v.addColorStop(1, 'rgba(3,7,16,0.7)'); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  const fo = P(t, DURATION - 0.4, 0.4); if (fo > 0) { ctx.fillStyle = `rgba(3,7,16,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.DURATION = DURATION;
+window.ready = Promise.all([document.fonts.load('400 100px "Anton"'), new Promise(r => logo.complete ? r() : (logo.onload = r))]).then(() => { render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
