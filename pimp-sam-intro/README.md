@@ -1,16 +1,16 @@
 # Pimp Sam & the Macksville Chronicles: intro
 
-`pimp-sam-intro.mp4`: 1920x1080, 30fps, 23s, H.264 + AAC (-14.8 LUFS).
+`pimp-sam-intro.mp4`: 1920x1080, 30fps, 23.5s, H.264 + AAC (-14.8 LUFS).
 
 | Time | Shot |
 |---|---|
-| 0–7.06s | Water tower open (with the narration box) |
-| 7.06s | Hard cut on the theme's big hit: barbershop push-in (played at 1.2x) |
-| 13.22s | Sam grande; the cane tap lands on the 13.96s beat (its sound is kept, other clip audio muted) |
-| 17.69s | Title card slams on the bar line over a blurred freeze of Sam: gold rays, sparkle burst, shine sweep |
-| 22.2–23s | Music fade, fade to black |
+| 0–8.23s | Water tower open. A virtual camera keeps the clip's narration box out of frame, starts on the welcome sign, then rises to the tower; "...the town called Macksville" (14.0s in the song) lands on the tower name at 7.0s |
+| 8.23s | Cut on the bar line: barbershop push-in (1.2x) |
+| 13.83s | Sam grande; the cane tap lands on the 14.48s beat (its sound is kept, other clip audio muted) |
+| 18.26s | Title card slams on the bar line over a blurred freeze of Sam: gold rays, sparkle burst, shine sweep |
+| 22.3–23.5s | Music fade, fade to black |
 
-Every cut is on the theme's beat grid (95.7 BPM, beats at 0.19 + n x 0.627s). The title card is the temporary one, cropped and upscaled 5x (`assets/title-card@5x.png`); drop a real logo into that file to swap it.
+The theme starts at 7.0s into the song. Every cut is on the theme's beat grid (95.7 BPM). The title card is the temporary one, cropped and upscaled 5x (`assets/title-card@5x.png`); drop a real logo into that file to swap it.
 
 ## Re-render
 ```

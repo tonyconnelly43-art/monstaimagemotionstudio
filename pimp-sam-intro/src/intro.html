@@ -10,8 +10,9 @@
 <script>
 // "Pimp Sam & the Macksville Chronicles" intro, 1920x1080, 23s.
 // Clips play from extracted 24fps frames; every cut sits on a beat of the theme
-// (95.7 BPM, beats at 0.19 + n * 0.627s). render(t) draws video time t.
-const W = 1920, H = 1080, DURATION = 23.0;
+// (95.7 BPM). The song starts at 7.0s so "...the town called Macksville" (14.0s in the
+// song) lands at video 7.0s on the water tower close-up. render(t) draws video time t.
+const W = 1920, H = 1080, DURATION = 23.5;
 const GOLD = '#d9a93a', PURPLE = '#8e4fc4';
 const ctx = document.getElementById('c').getContext('2d');
 const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -23,11 +24,11 @@ function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let
 
 // [name, frames, start (video s), end (video s), clip-time at start, playback speed]
 const CUTS = [
-  ['01-water-tower-open', 193, 0.0, 7.06, 0.0, 1.0],
-  ['02-barbershop-intro', 193, 7.06, 13.22, 0.0, 1.2],
-  ['03-sam-grande', 97, 13.22, 17.69, 0.0, 1.0],   // cane tap (0.74s) lands on the 13.96 beat
+  ['01-water-tower-open', 193, 0.0, 8.23, 0.0, 1.0],     // tower name at 7.0s; cut on the bar line
+  ['02-barbershop-intro', 193, 8.23, 13.83, 0.0, 1.2],
+  ['03-sam-grande', 97, 13.83, 18.26, 0.09, 1.0],         // cane tap (0.74s) lands on the 14.48 beat
 ];
-const TITLE = 17.69, BEATS = Array.from({ length: 40 }, (_, n) => 0.19 + n * 0.6265);
+const TITLE = 18.26, BEATS = Array.from({ length: 40 }, (_, n) => 0.0815 + n * 0.6265);
 
 const FR = {};
 function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
@@ -39,6 +40,18 @@ function clipFrame(cut, t) {
   const [name, n, a, , c0, sp] = cut;
   const k = Math.min(n - 1, Math.max(0, Math.floor((c0 + (t - a) * sp) * 24)));
   return FR[name][k];
+}
+// Water tower clip: a virtual camera keeps the source's baked-in narration box
+// (0..257 x 0..135 px of the 1280x720 frame) out of shot. It starts low on the town
+// (sign in view), slides right past the box, then rises to frame the full tower.
+function drawTowerShot(img, t, ox, oy) {
+  const cw = 1023, ch = 575;
+  const k1 = eIO(P(t, 1.6, 2.2)), k2 = eIO(P(t, 4.2, 2.4));
+  const sx = lerp(0, 257, k1);                 // x >= 257 clears the box ...
+  const sy = lerp(145, 0, k2);                 // ... before y rises above 135
+  const z = 1 + beatPunch(t) * 0.6;
+  const dw = W * z, dh = H * z;
+  ctx.drawImage(img, sx, sy, cw, ch, W / 2 - dw / 2 + ox, H / 2 - dh / 2 + oy, dw, dh);
 }
 function drawFrame(img, zoom = 1, ox = 0, oy = 0, filter = 'none') {
   const s = Math.max(W / img.width, H / img.height) * zoom;
@@ -56,12 +69,12 @@ function render(t) {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   const cut = CUTS.find(c => t >= c[2] && t < c[3]);
   let shx = 0, shy = 0;
-  for (const [ti, amp] of [[7.06, 10], [13.22, 8], [TITLE, 22]]) { const d = t - ti; if (d > 0 && d < 0.45) { const a = amp * Math.exp(-d * 10); shx += a * Math.sin(d * 85); shy += a * Math.cos(d * 70); } }
+  for (const [ti, amp] of [[8.23, 10], [13.83, 8], [TITLE, 22]]) { const d = t - ti; if (d > 0 && d < 0.45) { const a = amp * Math.exp(-d * 10); shx += a * Math.sin(d * 85); shy += a * Math.cos(d * 70); } }
   if (cut) {
     const lt = t - cut[2];
     const kick = lerp(1.06, 1, eOut(P(lt, 0, 0.35)));       // punch-in on each cut
-    const first = cut === CUTS[0];                          // keep the narration box in frame
-    drawFrame(clipFrame(cut, t), first ? 1 : kick + beatPunch(t), shx, shy);
+    if (cut === CUTS[0]) drawTowerShot(clipFrame(cut, t), t, shx, shy);
+    else drawFrame(clipFrame(cut, t), kick + beatPunch(t), shx, shy);
   } else {
     // title: last Sam frame frozen, pushed in, darkened + blurred
     const lt = t - TITLE;
@@ -111,7 +124,7 @@ function render(t) {
     ctx.restore();
   }
   // white flash on the cuts and the title slam
-  for (const [ti, a] of [[7.06, 0.5], [13.22, 0.45], [TITLE, 0.85]]) { const k = P(t, ti, 0.25); if (k > 0 && k < 1) { ctx.fillStyle = `rgba(255,255,255,${a * (1 - k)})`; ctx.fillRect(0, 0, W, H); } }
+  for (const [ti, a] of [[8.23, 0.5], [13.83, 0.45], [TITLE, 0.85]]) { const k = P(t, ti, 0.25); if (k > 0 && k < 1) { ctx.fillStyle = `rgba(255,255,255,${a * (1 - k)})`; ctx.fillRect(0, 0, W, H); } }
   // vignette + fades
   const v = ctx.createRadialGradient(W / 2, H / 2, 600, W / 2, H / 2, 1250);
   v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
