@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pimp Sam Intro</title>
+<style>html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// "Pimp Sam & the Macksville Chronicles" intro, 1920x1080, 23s.
+// Clips play from extracted 24fps frames; every cut sits on a beat of the theme
+// (95.7 BPM, beats at 0.19 + n * 0.627s). render(t) draws video time t.
+const W = 1920, H = 1080, DURATION = 23.0;
+const GOLD = '#d9a93a', PURPLE = '#8e4fc4';
+const ctx = document.getElementById('c').getContext('2d');
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// [name, frames, start (video s), end (video s), clip-time at start, playback speed]
+const CUTS = [
+  ['01-water-tower-open', 193, 0.0, 7.06, 0.0, 1.0],
+  ['02-barbershop-intro', 193, 7.06, 13.22, 0.0, 1.2],
+  ['03-sam-grande', 97, 13.22, 17.69, 0.0, 1.0],   // cane tap (0.74s) lands on the 13.96 beat
+];
+const TITLE = 17.69, BEATS = Array.from({ length: 40 }, (_, n) => 0.19 + n * 0.6265);
+
+const FR = {};
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+const loads = [];
+for (const [name, n] of CUTS) { FR[name] = []; for (let k = 1; k <= n; k++) loads.push(load(`../assets/frames/${name}/${String(k).padStart(3, '0')}.jpg`).then(i => FR[name][k - 1] = i)); }
+let title; loads.push(load('../assets/title-card@5x.png').then(i => title = i));
+
+function clipFrame(cut, t) {
+  const [name, n, a, , c0, sp] = cut;
+  const k = Math.min(n - 1, Math.max(0, Math.floor((c0 + (t - a) * sp) * 24)));
+  return FR[name][k];
+}
+function drawFrame(img, zoom = 1, ox = 0, oy = 0, filter = 'none') {
+  const s = Math.max(W / img.width, H / img.height) * zoom;
+  ctx.filter = filter;
+  ctx.drawImage(img, W / 2 - img.width * s / 2 + ox, H / 2 - img.height * s / 2 + oy, img.width * s, img.height * s);
+  ctx.filter = 'none';
+}
+// small zoom kick on every beat, bigger on cuts
+function beatPunch(t) { let z = 0; for (const b of BEATS) { const d = t - b; if (d >= 0 && d < 0.3) z += 0.012 * Math.exp(-d * 14); } return z; }
+
+const SPARK = (() => { const r = rng(4); return Array.from({ length: 120 }, () => ({ a: r() * 6.283, sp: 250 + r() * 900, s: 1.5 + r() * 4, gold: r() < 0.75, tw: r() * 6 })); })();
+
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const cut = CUTS.find(c => t >= c[2] && t < c[3]);
+  let shx = 0, shy = 0;
+  for (const [ti, amp] of [[7.06, 10], [13.22, 8], [TITLE, 22]]) { const d = t - ti; if (d > 0 && d < 0.45) { const a = amp * Math.exp(-d * 10); shx += a * Math.sin(d * 85); shy += a * Math.cos(d * 70); } }
+  if (cut) {
+    const lt = t - cut[2];
+    const kick = lerp(1.06, 1, eOut(P(lt, 0, 0.35)));       // punch-in on each cut
+    const first = cut === CUTS[0];                          // keep the narration box in frame
+    drawFrame(clipFrame(cut, t), first ? 1 : kick + beatPunch(t), shx, shy);
+  } else {
+    // title: last Sam frame frozen, pushed in, darkened + blurred
+    const lt = t - TITLE;
+    const bg = FR['03-sam-grande'][96];
+    drawFrame(bg, 1.0 + 0.05 * eOut(P(lt, 0, 5)) + beatPunch(t) * 0.5, shx, shy, `blur(${lerp(0, 10, eOut(P(lt, 0, 0.4)))}px) brightness(${lerp(1, 0.45, eOut(P(lt, 0, 0.4)))}) saturate(1.2)`);
+    // purple/gold glow
+    const g = ctx.createRadialGradient(W / 2, H / 2, 50, W / 2, H / 2, 900);
+    g.addColorStop(0, `rgba(142,79,196,${0.35 * eOut(P(lt, 0, 0.5))})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // light rays
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(lt * 0.15);
+    for (let i = 0; i < 14; i++) {
+      ctx.rotate(Math.PI * 2 / 14);
+      const rg = ctx.createLinearGradient(0, 0, 1200, 0);
+      rg.addColorStop(0, `rgba(217,169,58,${0.22 * eOut(P(lt, 0, 0.6))})`); rg.addColorStop(1, 'rgba(217,169,58,0)');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1200, -80); ctx.lineTo(1200, 80); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // sparkle burst
+    for (const p of SPARK) {
+      const d = p.sp * (1 - Math.exp(-lt * 1.5));
+      ctx.globalAlpha = cl(1 - lt / 4.5) * (0.6 + 0.4 * Math.sin(lt * 10 + p.tw));
+      ctx.fillStyle = p.gold ? GOLD : '#c89cff';
+      ctx.beginPath(); ctx.arc(W / 2 + Math.cos(p.a) * d * 1.4 + shx, H / 2 + Math.sin(p.a) * d * 0.75 + shy, p.s, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // plaque with the title card
+    const k = P(lt, 0, 0.22);
+    const s = lerp(2.2, 1, eOut(k)) * (1 + 0.015 * Math.sin(lt * Math.PI * 2 / 1.253));
+    const tw = 1180, th = tw * title.height / title.width;
+    ctx.save(); ctx.translate(W / 2 + shx, H / 2 + shy); ctx.scale(s, s); ctx.globalAlpha = cl(k * 5);
+    ctx.shadowColor = 'rgba(217,169,58,0.7)'; ctx.shadowBlur = 50;
+    ctx.fillStyle = '#0d0b0a'; ctx.beginPath(); ctx.roundRect(-tw / 2 - 26, -th / 2 - 26, tw + 52, th + 52, 30); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 8; ctx.strokeStyle = GOLD; ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(217,169,58,0.6)'; ctx.beginPath(); ctx.roundRect(-tw / 2 - 12, -th / 2 - 12, tw + 24, th + 24, 22); ctx.stroke();
+    ctx.drawImage(title, -tw / 2, -th / 2, tw, th);
+    // shine sweep across the plaque
+    const sw = P(lt, 0.5, 0.9);
+    if (sw > 0 && sw < 1) {
+      ctx.save(); ctx.beginPath(); ctx.roundRect(-tw / 2 - 26, -th / 2 - 26, tw + 52, th + 52, 30); ctx.clip();
+      const x = lerp(-tw, tw, eIO(sw));
+      const sg = ctx.createLinearGradient(x - 160, 0, x + 160, 0);
+      sg.addColorStop(0, 'rgba(255,240,200,0)'); sg.addColorStop(0.5, 'rgba(255,240,200,0.35)'); sg.addColorStop(1, 'rgba(255,240,200,0)');
+      ctx.fillStyle = sg; ctx.rotate(-0.25); ctx.fillRect(-tw, -th * 2, tw * 2, th * 4); ctx.restore();
+    }
+    ctx.restore();
+  }
+  // white flash on the cuts and the title slam
+  for (const [ti, a] of [[7.06, 0.5], [13.22, 0.45], [TITLE, 0.85]]) { const k = P(t, ti, 0.25); if (k > 0 && k < 1) { ctx.fillStyle = `rgba(255,255,255,${a * (1 - k)})`; ctx.fillRect(0, 0, W, H); } }
+  // vignette + fades
+  const v = ctx.createRadialGradient(W / 2, H / 2, 600, W / 2, H / 2, 1250);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  const fi = 1 - P(t, 0, 0.3); if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
+  const fo = P(t, DURATION - 0.8, 0.8); if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.DURATION = DURATION;
+window.ready = Promise.all(loads).then(() => { render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
