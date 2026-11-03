@@ -34,7 +34,9 @@ const FR = {};
 function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
 const loads = [];
 for (const [name, n] of CUTS) { FR[name] = []; for (let k = 1; k <= n; k++) loads.push(load(`../assets/frames/${name}/${String(k).padStart(3, '0')}.jpg`).then(i => FR[name][k - 1] = i)); }
-let title; loads.push(load('../assets/title-card@5x.png').then(i => title = i));
+let title; loads.push(load('../assets/title-card-cutout.png').then(i => title = i));
+// offscreen layer so the shine sweep only lands on the logo's own pixels
+const shineLayer = document.createElement('canvas'), shx2 = shineLayer.getContext('2d');
 
 function clipFrame(cut, t) {
   const [name, n, a, , c0, sp] = cut;
@@ -101,25 +103,28 @@ function render(t) {
       ctx.beginPath(); ctx.arc(W / 2 + Math.cos(p.a) * d * 1.4 + shx, H / 2 + Math.sin(p.a) * d * 0.75 + shy, p.s, 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    // plaque with the title card
+    // title card (cut out from its black background)
     const k = P(lt, 0, 0.22);
     const s = lerp(2.2, 1, eOut(k)) * (1 + 0.015 * Math.sin(lt * Math.PI * 2 / 1.253));
-    const tw = 1180, th = tw * title.height / title.width;
+    const tw = 1500, th = tw * title.height / title.width;
     ctx.save(); ctx.translate(W / 2 + shx, H / 2 + shy); ctx.scale(s, s); ctx.globalAlpha = cl(k * 5);
-    ctx.shadowColor = 'rgba(217,169,58,0.7)'; ctx.shadowBlur = 50;
-    ctx.fillStyle = '#0d0b0a'; ctx.beginPath(); ctx.roundRect(-tw / 2 - 26, -th / 2 - 26, tw + 52, th + 52, 30); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 8; ctx.strokeStyle = GOLD; ctx.stroke();
-    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(217,169,58,0.6)'; ctx.beginPath(); ctx.roundRect(-tw / 2 - 12, -th / 2 - 12, tw + 24, th + 24, 22); ctx.stroke();
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
     ctx.drawImage(title, -tw / 2, -th / 2, tw, th);
-    // shine sweep across the plaque
+    ctx.shadowColor = 'rgba(217,169,58,0.55)'; ctx.shadowBlur = 45 + 20 * Math.sin(lt * 4); ctx.shadowOffsetY = 0;
+    ctx.drawImage(title, -tw / 2, -th / 2, tw, th);
+    ctx.shadowBlur = 0;
+    // shine sweep, masked to the logo
     const sw = P(lt, 0.5, 0.9);
     if (sw > 0 && sw < 1) {
-      ctx.save(); ctx.beginPath(); ctx.roundRect(-tw / 2 - 26, -th / 2 - 26, tw + 52, th + 52, 30); ctx.clip();
-      const x = lerp(-tw, tw, eIO(sw));
-      const sg = ctx.createLinearGradient(x - 160, 0, x + 160, 0);
-      sg.addColorStop(0, 'rgba(255,240,200,0)'); sg.addColorStop(0.5, 'rgba(255,240,200,0.35)'); sg.addColorStop(1, 'rgba(255,240,200,0)');
-      ctx.fillStyle = sg; ctx.rotate(-0.25); ctx.fillRect(-tw, -th * 2, tw * 2, th * 4); ctx.restore();
+      shineLayer.width = Math.ceil(tw); shineLayer.height = Math.ceil(th);
+      shx2.clearRect(0, 0, tw, th); shx2.globalCompositeOperation = 'source-over';
+      shx2.drawImage(title, 0, 0, tw, th);
+      shx2.globalCompositeOperation = 'source-in';
+      const x = lerp(-tw * 0.3, tw * 1.3, eIO(sw));
+      const sg = shx2.createLinearGradient(x - 180, 0, x + 180, th * 0.4);
+      sg.addColorStop(0, 'rgba(255,245,210,0)'); sg.addColorStop(0.5, 'rgba(255,245,210,0.55)'); sg.addColorStop(1, 'rgba(255,245,210,0)');
+      shx2.fillStyle = sg; shx2.fillRect(0, 0, tw, th);
+      ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(shineLayer, -tw / 2, -th / 2); ctx.globalCompositeOperation = 'source-over';
     }
     ctx.restore();
   }
