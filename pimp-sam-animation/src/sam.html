@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pimp Sam Animation Options</title>
+<style>
+  @font-face { font-family: "Anton"; src: url("../assets/fonts/Anton.woff2") format("woff2"); }
+  @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Pimp Sam animation options, 1920x1080. One flat drawing (assets/sam-cutout.png,
+// 536x856) is split into a few pieces at runtime: head (nods), cane below the hand
+// (taps), eyes (blink by sliding his own lid down) and the body (sways/breathes via a
+// per-row bend). Smoke and bling glints are drawn on top. render(t) draws time t.
+const W = 1920, H = 1080, DURATION = 19.5;
+const BEAT0 = 0.19, BEAT = 0.6265;                 // theme song beat grid
+const GOLD = '#f2c14e', PURPLE = '#7a2fc0';
+const ctx = document.getElementById('c').getContext('2d');
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.8, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const beatPhase = t => ((t - BEAT0) / BEAT % 1 + 1) % 1;
+
+// ---------- segments ----------
+const SEG = [
+  { t0: 0.0, t1: 4.6, n: 1, title: 'IDLE SWAGGER', sub: 'Breathing sway · blinks · cigar smoke · bling glints' },
+  { t0: 4.6, t1: 9.6, n: 2, title: 'VIBING TO THE THEME', sub: 'Head nod + cane tap locked to the beat' },
+  { t0: 9.6, t1: 14.4, n: 3, title: 'STRUT-IN ENTRANCE', sub: 'Pimp walk in, stop, cane plant, puff of smoke' },
+  { t0: 14.4, t1: 19.5, n: 4, title: 'CHARACTER INTRO FREEZE', sub: 'Freeze frame + name card, like a show intro' },
+];
+
+// ---------- assets / rig pieces (cutout px) ----------
+const IMG = {};
+function load(n, src) { return new Promise(r => { const i = new Image(); i.onload = () => { IMG[n] = i; r(); }; i.src = src; }); }
+const SW = 536, SH = 856;
+const NECK = { x: 250, y: 336 }, HAND = { x: 68, y: 506 }, CANE_CUT = 548;
+const CIGAR = { x: 126, y: 290 };
+const EYES = [{ x: 207, y: 228, rx: 31, ry: 14 }, { x: 288, y: 232, rx: 27, ry: 12 }];
+const GLINTS = [[228, 492, 0.0], [360, 92, 0.35], [44, 452, 0.6], [360, 294, 0.15], [374, 548, 0.8], [70, 488, 0.45]];
+let BODY, HEAD, CANE;
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function buildRig() {
+  const s = IMG.sam;
+  // cane: opaque pixels left of the coat below the cut line
+  CANE = mk(SW, SH); const cg = CANE.getContext('2d');
+  cg.drawImage(s, 0, CANE_CUT, 95, SH - CANE_CUT, 0, CANE_CUT, 95, SH - CANE_CUT);
+  // head: everything above the neck, feathered into the fur collar
+  HEAD = mk(SW, SH); const hg = HEAD.getContext('2d');
+  hg.drawImage(s, 0, 0);
+  hg.globalCompositeOperation = 'destination-in';
+  const g = hg.createLinearGradient(0, NECK.y - 40, 0, NECK.y + 8);
+  g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  hg.fillStyle = g; hg.fillRect(0, 0, SW, SH);
+  // body: everything except the loose cane piece
+  BODY = mk(SW, SH); const bg = BODY.getContext('2d');
+  bg.drawImage(s, 0, 0); bg.clearRect(0, CANE_CUT, 95, SH - CANE_CUT);
+}
+
+// ---------- puppet ----------
+// pose: { x, y (feet centre on screen), sc, sway (px at head), breathe, nod (rad), cane (rad), blink (0..1), squash }
+const SAM_FOOT = { x: 290, y: 846 };
+function drawSam(p, t) {
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.scale(p.sc * (1 + (p.squash || 0)), p.sc * (1 - (p.squash || 0))); ctx.rotate(p.tilt || 0);
+  ctx.translate(-SAM_FOOT.x, -SAM_FOOT.y);
+  // ground shadow
+  if (!p.noShadow) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(SAM_FOOT.x - 10, SAM_FOOT.y - 4, 230, 26, 0, 0, 7); ctx.fill(); ctx.restore(); }
+  const bend = y => p.sway * Math.pow(cl((SAM_FOOT.y - y) / SAM_FOOT.y), 1.6);
+  const breathe = y => 1 + p.breathe * cl((y - 380) / 300) * cl((760 - y) / 120);
+  // cane (behind the hand): rotates about the grip, follows the hand's bend
+  ctx.save(); ctx.translate(HAND.x + bend(HAND.y), HAND.y); ctx.rotate(p.cane); ctx.translate(-HAND.x, -HAND.y); ctx.drawImage(CANE, 0, 0); ctx.restore();
+  // body in 4px rows with the bend + breathing
+  const step = 4;
+  for (let y = NECK.y - 50; y < SH; y += step) {
+    const k = breathe(y), w = SW * k;
+    ctx.drawImage(BODY, 0, y, SW, step, bend(y) + (SW - w) * (SAM_FOOT.x / SW), y, w, step + 0.6);
+  }
+  // head: nods about the neck, rides on the bend
+  ctx.save(); ctx.translate(NECK.x + bend(NECK.y - 120), NECK.y); ctx.rotate(p.nod); ctx.translate(-NECK.x, -NECK.y);
+  ctx.drawImage(HEAD, 0, 0);
+  // blink: his own upper lid (the strip just above each eye) slides down over the eye
+  if (p.blink > 0) for (const e of EYES) {
+    ctx.save(); ctx.beginPath(); ctx.ellipse(e.x, e.y, e.rx, e.ry + 2, 0, 0, 7); ctx.clip();
+    const lidTop = e.y - e.ry - 8, cover = (e.ry * 2 + 6) * p.blink;
+    ctx.drawImage(IMG.sam, e.x - e.rx - 2, lidTop, e.rx * 2 + 4, 8, e.x - e.rx - 2, e.y - e.ry - 2, e.rx * 2 + 4, cover);
+    ctx.strokeStyle = 'rgba(30,12,6,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(e.x - e.rx, e.y - e.ry - 2 + cover); ctx.quadraticCurveTo(e.x, e.y - e.ry + 2 + cover, e.x + e.rx, e.y - e.ry - 2 + cover); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+function toScreen(p, x, y) {
+  const bend = p.sway * Math.pow(cl((SAM_FOOT.y - y) / SAM_FOOT.y), 1.6);
+  return [p.x + (x + bend - SAM_FOOT.x) * p.sc, p.y + (y - SAM_FOOT.y) * p.sc];
+}
+
+// ---------- smoke + glints ----------
+const PUFFS = (() => { const r = rng(5); return Array.from({ length: 40 }, (_, i) => ({ born: i * 0.42 + r() * 0.2, dx: (r() - 0.5) * 30, curl: r() * 6, s: 0.7 + r() * 0.6 })); })();
+function smoke(p, t, big = 0) {
+  const [cx, cy] = toScreen(p, CIGAR.x + Math.sin(p.nod) * 10, CIGAR.y + p.nod * 60);
+  for (const q of PUFFS) {
+    const a = t - q.born; if (a < 0 || a > 2.6) continue;
+    const k = a / 2.6;
+    const x = cx - 10 + q.dx * k + Math.sin(a * 2.4 + q.curl) * 22 * k, y = cy - a * 95;
+    const r = (8 + a * 26) * q.s * p.sc;
+    ctx.fillStyle = `rgba(225,225,230,${0.22 * (1 - k) * Math.min(1, a * 5)})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+  if (big > 0) {   // big exhale cloud
+    for (let i = 0; i < 9; i++) {
+      const a = big * 1.6, ang = -2.6 + i * 0.18;
+      const x = cx - 20 + Math.cos(ang) * (40 + a * 150), y = cy - 10 + Math.sin(ang) * (20 + a * 70) - a * 40;
+      ctx.fillStyle = `rgba(230,230,235,${0.32 * (1 - big)})`; ctx.beginPath(); ctx.arc(x, y, (20 + a * 55) * p.sc, 0, 7); ctx.fill();
+    }
+  }
+}
+function glints(p, t) {
+  for (const [x, y, ph] of GLINTS) {
+    const k = ((t * 0.55 + ph) % 1); if (k > 0.16) continue;
+    const s = Math.sin(k / 0.16 * Math.PI), [sx, sy] = toScreen(p, x, y), L = 30 * s * p.sc;
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(0.3); ctx.fillStyle = `rgba(255,250,225,${0.95 * s})`;
+    ctx.beginPath(); ctx.moveTo(0, -L); ctx.lineTo(L * 0.14, 0); ctx.lineTo(0, L); ctx.lineTo(-L * 0.14, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-L * 0.7, 0); ctx.lineTo(0, L * 0.1); ctx.lineTo(L * 0.7, 0); ctx.lineTo(0, -L * 0.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${s})`; ctx.beginPath(); ctx.arc(0, 0, 4 * s, 0, 7); ctx.fill(); ctx.restore();
+  }
+}
+const BLINKS = [1.3, 3.6, 6.9, 11.2, 13.4];
+const blinkAt = t => Math.max(0, ...BLINKS.map(b => { const d = Math.abs(t - b); return d < 0.1 ? 1 - d / 0.1 : 0; }));
+
+// ---------- scene ----------
+function background(t, dim = 0.5, blur = 3) {
+  const img = IMG.bg, s = Math.max(W / img.width, H / img.height) * (1.05 + 0.01 * Math.sin(t * 0.3));
+  ctx.filter = `blur(${blur}px) brightness(${1 - dim}) saturate(1.1)`;
+  ctx.drawImage(img, W / 2 - img.width * s / 2, H / 2 - img.height * s / 2 - 40, img.width * s, img.height * s);
+  ctx.filter = 'none';
+  const g = ctx.createLinearGradient(0, H * 0.55, 0, H); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function label(seg, t) {
+  const lt = t - seg.t0, k = P(lt, 0.05, 0.35), out = P(t, seg.t1 - 0.25, 0.25);
+  ctx.save(); ctx.globalAlpha = cl(k * 3) * (1 - out);
+  const x = 70 + (1 - eOut(k)) * -60, y = 70;
+  ctx.fillStyle = PURPLE; ctx.beginPath(); ctx.roundRect(x, y, 96, 96, 18); ctx.fill();
+  ctx.font = '400 66px "Anton"'; ctx.fillStyle = GOLD; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(seg.n), x + 48, y + 52);
+  ctx.textAlign = 'left'; ctx.font = '400 64px "Anton"'; ctx.letterSpacing = '3px';
+  ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineJoin = 'round'; ctx.strokeText(seg.title, x + 122, y + 40); ctx.fillStyle = '#fff'; ctx.fillText(seg.title, x + 122, y + 40);
+  ctx.font = '700 28px "Montserrat"'; ctx.letterSpacing = '1px'; ctx.lineWidth = 7; ctx.strokeText(seg.sub, x + 124, y + 92); ctx.fillStyle = GOLD; ctx.fillText(seg.sub, x + 124, y + 92);
+  ctx.restore(); ctx.letterSpacing = '0px';
+}
+
+function poseIdle(t, x) {
+  return { x, y: 1040, sc: 0.95, sway: 14 * Math.sin(t * 1.6), breathe: 0.012 * Math.sin(t * 2.4), nod: 0.025 * Math.sin(t * 1.6 + 0.6), cane: 0.0, blink: blinkAt(t) };
+}
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const seg = SEG.find(s => t >= s.t0 && t < s.t1) || SEG[SEG.length - 1];
+  const lt = t - seg.t0;
+  if (seg.n === 1) {
+    background(t);
+    const p = poseIdle(t, 1150);
+    const spr = P(lt, 0, 0.45); p.sc *= lerp(0.5, 1, eBack(spr)); p.squash = 0;   // quick pop in
+    smoke(p, t); drawSam(p, t); glints(p, t);
+  } else if (seg.n === 2) {
+    background(t);
+    const ph = beatPhase(t), beatIdx = Math.floor((t - BEAT0) / BEAT);
+    const hit = Math.exp(-ph * 6);                                        // energy right on each beat
+    const p = poseIdle(t, 1150);
+    p.nod = 0.09 * hit - 0.02; p.sway = 10 * Math.sin((t - BEAT0) / BEAT * Math.PI); p.squash = 0.012 * hit;
+    const two = beatIdx % 2 === 0;                                        // cane lifts and taps every other beat
+    p.cane = two ? -0.16 * Math.sin(Math.min(1, ph) * Math.PI) * 0.6 : -0.16 * (1 - Math.min(1, ph * 3)) * 0.25 + 0;
+    p.cane = two ? -0.14 * Math.sin(ph * Math.PI) : 0;
+    smoke(p, t); drawSam(p, t); glints(p, t);
+    // tap dust when the cane lands (start of each odd beat)
+    if (!two && ph < 0.4) {
+      const [tx, ty] = toScreen(p, 40, 812), k = ph / 0.4;
+      ctx.strokeStyle = `rgba(255,255,255,${0.7 * (1 - k)})`; ctx.lineWidth = 4;
+      for (const a of [-2.6, -2.1, -1.0, -0.5]) { ctx.beginPath(); ctx.moveTo(tx + Math.cos(a) * (14 + k * 18), ty + Math.sin(a) * (10 + k * 12)); ctx.lineTo(tx + Math.cos(a) * (30 + k * 30), ty + Math.sin(a) * (22 + k * 20)); ctx.stroke(); }
+    }
+  } else if (seg.n === 3) {
+    background(t);
+    const walkEnd = 2.5, wk = P(lt, 0, walkEnd), x = lerp(-420, 1060, eOut(wk) * 0.35 + wk * 0.65);
+    const stepT = lt / 0.42, walking = lt < walkEnd;
+    const p = poseIdle(t, x);
+    if (walking) {
+      const s = Math.abs(Math.sin(stepT * Math.PI));
+      p.y = 1040 - s * 26; p.tilt = 0.06 * Math.sin(stepT * Math.PI) - 0.03; p.sway = -18 + 10 * Math.sin(stepT * Math.PI);
+      p.nod = 0.05 * Math.sin(stepT * Math.PI * 2); p.cane = 0.22 * Math.sin(stepT * Math.PI);
+    } else {
+      const s = lt - walkEnd;                                             // settle: lean back, cane plant, exhale
+      p.sway = -18 * Math.exp(-s * 5) * Math.cos(s * 12) + 6 * Math.sin(s * 1.6);
+      p.squash = 0.03 * Math.exp(-s * 8) * Math.cos(s * 18);
+      p.cane = s < 0.25 ? -0.25 * Math.sin(s / 0.25 * Math.PI) : 0;
+      p.nod = -0.06 * eOut(P(s, 0.4, 0.3)) * (1 - P(s, 1.4, 0.4));        // chin up for the exhale
+    }
+    const big = !walking ? P(lt, walkEnd + 0.55, 1.2) : 0;
+    smoke(p, t, big > 0 && big < 1 ? big : 0); drawSam(p, t); if (!walking) glints(p, t);
+    if (!walking && lt - walkEnd < 0.35) { const [tx, ty] = toScreen(p, 40, 812), k = (lt - walkEnd) / 0.35; ctx.fillStyle = `rgba(220,210,190,${0.5 * (1 - k)})`; for (const dx of [-40, -15, 15, 40]) { ctx.beginPath(); ctx.arc(tx + dx * (1 + k), ty - 6 - k * 20, 10 + k * 14, 0, 7); ctx.fill(); } }
+  } else {
+    // freeze frame: colour pop, purple/gold rays, show logo + name strap
+    const fz = 14.9, frozen = t >= fz, tt = frozen ? fz : t;
+    const p = poseIdle(tt, 760); p.sc = 1.05;
+    if (!frozen) { background(t); smoke(p, t); drawSam(p, tt); glints(p, t); }
+    else {
+      const k = P(t, fz, 0.25);
+      background(fz, lerp(0.5, 0.75, k), lerp(3, 10, k));
+      ctx.save(); ctx.translate(760, 620); ctx.rotate((t - fz) * 0.12);
+      for (let i = 0; i < 18; i++) { ctx.rotate(Math.PI * 2 / 18); ctx.fillStyle = i % 2 ? `rgba(122,47,192,${0.55 * k})` : `rgba(242,193,78,${0.28 * k})`; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1600, -150); ctx.lineTo(1600, 150); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      // white comic outline around Sam
+      ctx.save(); for (const [dx, dy] of [[-6, 0], [6, 0], [0, -6], [0, 6], [-4, -4], [4, 4], [-4, 4], [4, -4]]) { ctx.save(); ctx.translate(dx, dy); ctx.filter = 'brightness(0) invert(1)'; drawSam({ ...p, noShadow: true }, fz); ctx.restore(); } ctx.restore();
+      ctx.filter = 'none'; smoke(p, fz); drawSam(p, fz);
+      const lk = P(t, fz + 0.15, 0.3), lw = 820, lh = lw * IMG.logo.height / IMG.logo.width;
+      ctx.save(); ctx.translate(1390, 440); const s = lerp(1.8, 1, eOut(lk)); ctx.scale(s, s); ctx.rotate(-0.05); ctx.globalAlpha = cl(lk * 4);
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 30; ctx.drawImage(IMG.logo, -lw / 2, -lh / 2, lw, lh); ctx.restore();
+      const sk = P(t, fz + 0.55, 0.3);
+      if (sk > 0) {
+        ctx.save(); ctx.translate(1390 + (1 - eOut(sk)) * 700, 800); ctx.rotate(-0.04);
+        ctx.fillStyle = PURPLE; ctx.beginPath(); ctx.roundRect(-330, -58, 660, 116, 14); ctx.fill(); ctx.strokeStyle = GOLD; ctx.lineWidth = 6; ctx.stroke();
+        ctx.font = '400 74px "Anton"'; ctx.letterSpacing = '6px'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText('PIMP SAM', 3, 4);
+        ctx.restore(); ctx.letterSpacing = '0px';
+      }
+      const fl = 1 - P(t, fz, 0.2); if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${0.8 * fl})`; ctx.fillRect(0, 0, W, H); }
+    }
+  }
+  label(seg, t);
+  // transitions: quick purple wipe between options
+  for (const s of SEG.slice(1)) {
+    const k = P(t, s.t0 - 0.22, 0.44); if (k <= 0 || k >= 1) continue;
+    const x = lerp(-W * 1.3, W * 1.3, eIO(k));
+    ctx.fillStyle = PURPLE; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + W, 0); ctx.lineTo(x + W - 300, H); ctx.lineTo(x - 300, H); ctx.fill();
+    ctx.fillStyle = GOLD; ctx.fillRect(0, 0, 0, 0); ctx.beginPath(); ctx.moveTo(x + W, 0); ctx.lineTo(x + W + 40, 0); ctx.lineTo(x + W - 260, H); ctx.lineTo(x + W - 300, H); ctx.fill();
+  }
+  const fi = 1 - P(t, 0, 0.3); if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
+  const fo = P(t, DURATION - 0.6, 0.6); if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.DURATION = DURATION;
+window.ready = Promise.all([load('sam', '../assets/sam-cutout.png'), load('bg', '../assets/barbershop.jpg'), load('logo', '../assets/title-card-v3.png'),
+  document.fonts.load('400 100px "Anton"'), document.fonts.load('700 100px "Montserrat"')]).then(() => { buildRig(); render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
