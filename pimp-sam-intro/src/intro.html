@@ -34,7 +34,7 @@ const FR = {};
 function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
 const loads = [];
 for (const [name, n] of CUTS) { FR[name] = []; for (let k = 1; k <= n; k++) loads.push(load(`../assets/frames/${name}/${String(k).padStart(3, '0')}.jpg`).then(i => FR[name][k - 1] = i)); }
-let title; loads.push(load('../assets/title-card-cutout.png').then(i => title = i));
+let title; loads.push(load('../assets/title-card-v3.png').then(i => title = i));
 // offscreen layer so the shine sweep only lands on the logo's own pixels
 const shineLayer = document.createElement('canvas'), shx2 = shineLayer.getContext('2d');
 
@@ -106,7 +106,7 @@ function render(t) {
     // title card (cut out from its black background)
     const k = P(lt, 0, 0.22);
     const s = lerp(2.2, 1, eOut(k)) * (1 + 0.015 * Math.sin(lt * Math.PI * 2 / 1.253));
-    const tw = 1500, th = tw * title.height / title.width;
+    const th = 860, tw = th * title.width / title.height;      // tall script logo: size by height
     ctx.save(); ctx.translate(W / 2 + shx, H / 2 + shy); ctx.scale(s, s); ctx.globalAlpha = cl(k * 5);
     ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
     ctx.drawImage(title, -tw / 2, -th / 2, tw, th);

@@ -10,7 +10,7 @@
 | 18.26s | Title card slams on the bar line over a blurred freeze of Sam: gold rays, sparkle burst, gold glow, shine sweep masked to the logo |
 | 22.3–23.5s | Music fade, fade to black |
 
-The theme starts at 7.0s into the song. Every cut is on the theme's beat grid (95.7 BPM). The title card (`assets/title-card-v2.webp`) comes on a black background; `src/cutout_title.py` removes only the black outside the badge (sealing small gaps in the gold frame first) and writes `assets/title-card-cutout.png`, which the intro uses.
+The theme starts at 7.0s into the song. Every cut is on the theme's beat grid (95.7 BPM). The title card is `assets/title-card-v3.png` (the "Pimp Sam's Macksville Chronicles" logo, transparent, trimmed). The earlier card and its cutout script (`src/cutout_title.py`, `assets/title-card-v2.webp`) are kept for reference.
 
 ## Re-render
 ```
