@@ -1,0 +1,324 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Monsta Vintage TV Reveal</title>
+<style>html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// MONSTA vintage TV logo reveal. 1920x1080, render(t) draws video time t.
+// Everything happens in the TV photo's pixel space (1536x1024); a virtual camera
+// (centre cx,cy + zoom Z) frames it. The CRT picture is drawn procedurally inside
+// the screen outline, so the camera can push through the glass into the clean
+// final frame: at Z = ZF the frame sits entirely inside the screen and the logo
+// there is the untouched original artwork.
+const W = 1920, H = 1080, DURATION = 12.5;
+const ctx = document.getElementById('c').getContext('2d');
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIn = x => x * x * x;
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- timeline ----------
+const T = { on: 0.6, cut1: 2.0, clicks: [2.4, 2.95, 3.5], cut2: 4.0, settle: 6.0, lock: 7.0, push0: 8.2, push1: 9.6 };
+// ---------- geometry (photo px) ----------
+const SC = { x0: 206, y0: 164, x1: 1058, y1: 812, r: 100, bow: 8 };
+const SCX = (SC.x0 + SC.x1) / 2, SCY = (SC.y0 + SC.y1) / 2, SW = SC.x1 - SC.x0, SH = SC.y1 - SC.y0;
+const KNOB = { x: 1283, y: 242, r: 63 };
+const ZF = 3.0;                                   // final zoom: frame = 640x360 photo px
+const LOGO_W = 880 / ZF, LOGO_H = LOGO_W * 242 / 800;   // logo is 880px wide in the final frame
+
+// ---------- assets ----------
+const tv = new Image(); tv.src = '../assets/img/tv.webp';
+const logo = new Image(); logo.src = '../assets/img/monsta-logo.png';
+let PLATE, PLATE_OX = 420, PLATE_OY = 260, KNOBIMG, LOGO_M, LOGO_C;
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function buildAssets() {
+  // backdrop: blurred dark extension around the photo, photo on top with feathered edges
+  PLATE = mk(1536 + PLATE_OX * 2, 1024 + PLATE_OY * 2);
+  const p = PLATE.getContext('2d');
+  p.filter = 'blur(40px) brightness(0.35)';
+  p.drawImage(tv, -200, -200, PLATE.width + 400, PLATE.height + 400);
+  p.filter = 'none';
+  const f = mk(1536, 1024), g = f.getContext('2d');
+  g.drawImage(tv, 0, 0);
+  g.globalCompositeOperation = 'destination-out';
+  const F = 70;
+  for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [[0, 0, F, 0, 0, 0, F, 1024], [1536, 0, 1536 - F, 0, 1536 - F, 0, F, 1024], [0, 0, 0, F, 0, 0, 1536, F], [0, 1024, 0, 1024 - F, 0, 1024 - F, 1536, F]]) {
+    const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(rx, ry, rw, rh);
+  }
+  p.drawImage(f, PLATE_OX, PLATE_OY);
+  // knob crop for rotation
+  KNOBIMG = mk(KNOB.r * 2, KNOB.r * 2);
+  KNOBIMG.getContext('2d').drawImage(tv, KNOB.x - KNOB.r, KNOB.y - KNOB.r, KNOB.r * 2, KNOB.r * 2, 0, 0, KNOB.r * 2, KNOB.r * 2);
+  // tinted copies of the logo for chromatic displacement (temporary effect only)
+  const tint = col => { const c = mk(800, 242), x = c.getContext('2d'); x.drawImage(logo, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, 800, 242); return c; };
+  LOGO_M = tint('#ff2bd6'); LOGO_C = tint('#19e6ff');
+}
+
+// ---------- screen outline ----------
+function screenPath(c) {
+  const { x0, y0, x1, y1, r, bow } = SC;
+  c.beginPath();
+  c.moveTo(x0 + r, y0);
+  c.quadraticCurveTo((x0 + x1) / 2, y0 - bow * 2, x1 - r, y0);
+  c.quadraticCurveTo(x1, y0, x1, y0 + r);
+  c.quadraticCurveTo(x1 + bow * 2, (y0 + y1) / 2, x1, y1 - r);
+  c.quadraticCurveTo(x1, y1, x1 - r, y1);
+  c.quadraticCurveTo((x0 + x1) / 2, y1 + bow * 2, x0 + r, y1);
+  c.quadraticCurveTo(x0, y1, x0, y1 - r);
+  c.quadraticCurveTo(x0 - bow * 2, (y0 + y1) / 2, x0, y0 + r);
+  c.quadraticCurveTo(x0, y0, x0 + r, y0);
+  c.closePath();
+}
+
+// ---------- camera ----------
+function cam(t) {
+  if (t < T.cut1) { const k = eIO(P(t, 0, T.cut1)); return { cx: lerp(770, 735, k), cy: lerp(505, 492, k), Z: lerp(1.08, 1.2, k) }; }
+  if (t < T.cut2) { const k = P(t, T.cut1, T.cut2 - T.cut1); return { cx: lerp(1132, 1150, k), cy: lerp(302, 292, k), Z: lerp(2.35, 2.5, k) }; }
+  if (t < T.push0) { const k = P(t, T.cut2, T.push0 - T.cut2); return { cx: lerp(700, 645, eOut(k)), cy: lerp(496, 489, k), Z: lerp(1.3, 1.44, k) }; }
+  const k = eIO(P(t, T.push0, T.push1 - T.push0));
+  return { cx: lerp(645, SCX, k), cy: lerp(489, SCY, k), Z: Math.exp(lerp(Math.log(1.44), Math.log(ZF), k)) };
+}
+function knobAngle(t) {
+  let a = 0;
+  for (const c of T.clicks) { const d = t - c; if (d > 0) a += 0.49 * (d > 0.22 ? 1 : 1 - Math.exp(-d * 30) * Math.cos(d * 40)); }
+  return a;
+}
+
+// ---------- screen content (screen-local px, origin = top-left of screen bbox) ----------
+const BUF = mk(SW * 2, SH * 2), B = BUF.getContext('2d');
+const NOISE = mk(213, 324), NZ = NOISE.getContext('2d'), NZD = NZ.createImageData(213, 324);
+function snow(seed, contrast = 1, color = 0) {
+  const r = rng(seed), d = NZD.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = Math.pow(r(), 1.6 - 0.5 * contrast) * 255;
+    if (color) { d[i] = v * (0.8 + 0.4 * r()); d[i + 1] = v * (0.8 + 0.4 * r()); d[i + 2] = v * (0.9 + 0.3 * r()); }
+    else d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = 255;
+  }
+  NZ.putImageData(NZD, 0, 0);
+  return NOISE;
+}
+const STREAK_COLS = ['#ff2bd6', '#19e6ff', '#3b6bff', '#36ff7a', '#ffe23a', '#ff2bd6', '#19e6ff'];
+function streaks(c, t, amount, seed) {
+  // colourful VHS tracking streaks rolling down the picture
+  const r = rng(seed);
+  c.save(); c.globalCompositeOperation = 'screen';
+  const n = 22;
+  for (let i = 0; i < n; i++) {
+    const base = r() * SH, speed = 60 + r() * 220, h = 3 + r() * 26 * (0.5 + amount);
+    const y = ((base + t * speed) % (SH + 60)) - 30;
+    const col = STREAK_COLS[i % STREAK_COLS.length];
+    const a = (0.45 + 0.55 * r()) * amount;
+    const g2 = c.createLinearGradient(0, 0, SW, 0);
+    const x0 = r() * 0.7, x1 = Math.min(1, x0 + 0.2 + r() * 0.8);       // streak runs from x0 to x1 (fractions of width)
+    g2.addColorStop(0, 'rgba(0,0,0,0)'); g2.addColorStop(x0, 'rgba(0,0,0,0)');
+    g2.addColorStop(x0 + 0.03, col); g2.addColorStop(Math.max(x0 + 0.04, x1 - 0.03), col); g2.addColorStop(x1, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    c.globalAlpha = a * (0.6 + 0.4 * Math.sin(t * 23 + i));
+    c.fillStyle = g2; c.fillRect(0, y, SW, h);
+  }
+  c.restore();
+}
+function trackingBand(c, y, h, alpha, seed) {
+  // the classic white noise band of a mistracked tape
+  c.save(); c.globalAlpha = alpha; c.globalCompositeOperation = 'screen';
+  c.drawImage(snow(seed, 1.2), 0, 0, 213, Math.max(1, h / 2), 0, y, SW, h);
+  c.fillStyle = `rgba(255,255,255,${0.25})`; c.fillRect(0, y + h * 0.4, SW, Math.max(1, h * 0.12));
+  c.restore();
+}
+function drawLogo(c, x, y, w, alpha = 1, chroma = 0, sliceSeed = 0, slices = 0) {
+  const h = w * 242 / 800;
+  c.save(); c.globalAlpha = alpha;
+  if (chroma > 0.3) {
+    c.globalCompositeOperation = 'screen';
+    c.globalAlpha = alpha * 0.8; c.drawImage(LOGO_M, x - w / 2 - chroma, y - h / 2, w, h);
+    c.drawImage(LOGO_C, x - w / 2 + chroma, y - h / 2, w, h);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = alpha;
+  }
+  if (slices) {
+    // fragmented: draw the logo in horizontal slices pushed sideways
+    const r = rng(sliceSeed), n = slices;
+    for (let i = 0; i < n; i++) {
+      const sy = i / n * 242, sh = 242 / n, off = (r() - 0.5) * slices * 14;
+      if (r() < 0.35) continue;
+      c.drawImage(logo, 0, sy, 800, sh, x - w / 2 + off, y - h / 2 + i / n * h, w, h / n);
+    }
+  } else c.drawImage(logo, x - w / 2, y - h / 2, w, h);
+  c.restore();
+}
+function navyBg(c, w, h) {
+  const g = c.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, Math.max(w, h) * 0.75);
+  g.addColorStop(0, '#16274f'); g.addColorStop(1, '#070f22');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+}
+
+// Fills BUF (2x screen-local) with the CRT picture for t < lock. Returns
+// { tear, roll, bright } distortion info used when compositing.
+function renderPicture(t) {
+  const f = Math.floor(t * 30), c = B;
+  c.setTransform(2, 0, 0, 2, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  c.fillStyle = '#000'; c.fillRect(0, 0, SW, SH);
+  const info = { tear: 0, roll: 0, bright: 0.6, glow: 'rgba(170,200,255,' };
+  if (t < T.on) { c.fillStyle = '#101314'; c.fillRect(0, 0, SW, SH); info.bright = 0; return info; }
+  if (t < T.on + 0.35) {
+    // power on: a bright line opens to full height, then snow appears through the flash
+    const k = P(t, T.on, 0.35), h = lerp(3, SH, eOut(k));
+    c.globalAlpha = cl(k * 2); c.drawImage(snow(f * 13 + 1), 0, 0, SW, SH);
+    c.globalAlpha = 1 - k * 0.6; c.fillStyle = '#e8f0ff'; c.fillRect(0, SH / 2 - h / 2, SW, h);
+    c.globalAlpha = 1; info.bright = 1 - k * 0.3; return info;
+  }
+  // which "station" are we on
+  const clickIdx = T.clicks.filter(x => t >= x).length;
+  const sinceClick = clickIdx ? t - T.clicks[clickIdx - 1] : 9;
+  if (t < T.cut2) {
+    if (sinceClick < 0.07) { info.bright = 0; return info; }             // momentary black between stations
+    const fl = 0.85 + 0.15 * Math.sin(t * 47);
+    if (clickIdx === 0) { c.globalAlpha = fl; c.drawImage(snow(f * 13 + 1), 0, 0, SW, SH); }
+    else if (clickIdx === 1) {
+      // rolling picture: snow with a dark hold bar rolling down
+      info.roll = (t * 900) % SH;
+      c.drawImage(snow(f * 17 + 2, 0.7), 0, 0, SW, SH);
+      c.fillStyle = 'rgba(0,0,0,0.85)'; const y = info.roll; c.fillRect(0, y - 40, SW, 80); c.fillRect(0, y - 40 - SH, SW, 80);
+    } else if (clickIdx === 2) {
+      // signal breakup: dim grey field torn into lines
+      c.fillStyle = '#2a2d33'; c.fillRect(0, 0, SW, SH);
+      c.globalAlpha = 0.55; c.drawImage(snow(f * 19 + 3, 0.5), 0, 0, SW, SH); c.globalAlpha = 1;
+      const r = rng(f * 7 + 5);
+      for (let i = 0; i < 22; i++) { c.fillStyle = r() < 0.5 ? 'rgba(230,235,245,0.55)' : 'rgba(0,0,0,0.7)'; c.fillRect(0, r() * SH, SW, 1 + r() * 5); }
+      info.tear = 0.5; info.bright = 0.35;
+    } else {
+      // snow with heavy horizontal roll and the first hints of colour
+      c.drawImage(snow(f * 23 + 4, 1.1), 0, 0, SW, SH);
+      streaks(c, t, 0.35, 77); info.tear = 0.4;
+      c.globalAlpha = 0.18; c.fillStyle = '#000'; c.fillRect(0, (t * 520) % SH, SW, 60);
+    }
+    return info;
+  }
+  // VHS tracking (4.0 - lock): damaged tape, logo fragments surfacing, then settling
+  const d = 1 - eIO(P(t, T.settle, T.lock - T.settle));                 // distortion amount
+  navyBg(c, SW, SH);
+  const lx = SW / 2, ly = SH / 2;
+  if (t < T.settle) {
+    // barely recognisable fragments, flickering in and out
+    const r = rng(f * 3 + 9), vis = r();
+    if (vis < 0.55 + 0.4 * P(t, T.cut2, 2)) drawLogo(c, lx + (r() - 0.5) * 120, ly + (r() - 0.5) * 140, LOGO_W * (0.9 + r() * 0.3), 0.35 + 0.4 * r(), 14, f, 9);
+  } else {
+    drawLogo(c, lx, ly, LOGO_W, lerp(0.75, 1, 1 - d), 12 * d, f, d > 0.35 ? Math.round(9 * d) : 0);
+  }
+  c.globalAlpha = 0.55 * d + 0.06; c.globalCompositeOperation = 'screen'; c.drawImage(snow(f * 29 + 6, 0.6, 1), 0, 0, SW, SH);
+  c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  streaks(c, t, d, 11);
+  // tracking bands: several during the mess, one final band rolling up just before lock
+  if (t < T.settle) { trackingBand(c, (t * 340) % SH, 34, 0.7, f * 31); trackingBand(c, SH - (t * 210) % SH, 18, 0.5, f * 37); }
+  const fb = P(t, 6.45, 0.55);
+  if (fb > 0 && fb < 1) trackingBand(c, lerp(SH + 20, -60, eIO(fb)), 40, 0.75, f * 41);
+  info.tear = d; info.roll = t < T.settle ? Math.max(0, Math.sin(t * 2.3)) * 140 : 0;
+  info.bright = 0.5 + 0.2 * (1 - d);
+  info.glow = d > 0.3 ? 'rgba(220,120,255,' : 'rgba(225,60,70,';
+  return info;
+}
+
+// ---------- main render ----------
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const { cx, cy, Z } = cam(t);
+  const pushK = P(t, T.push0, T.push1 - T.push0);
+  const clean = eIO(P(t, 8.85, 0.7));                                   // analog layer dissolves while passing through the glass
+  const before = t < T.lock;
+  const info = before ? renderPicture(t) : { tear: 0, roll: 0, bright: 0.75, glow: 'rgba(225,60,70,' };
+  ctx.setTransform(Z, 0, 0, Z, W / 2 - cx * Z, H / 2 - cy * Z);
+
+  // TV + backdrop
+  ctx.drawImage(PLATE, -PLATE_OX, -PLATE_OY);
+  // rotating channel knob
+  ctx.save(); ctx.beginPath(); ctx.arc(KNOB.x, KNOB.y, KNOB.r - 1, 0, 7); ctx.clip();
+  ctx.translate(KNOB.x, KNOB.y); ctx.rotate(knobAngle(t)); ctx.drawImage(KNOBIMG, -KNOB.r, -KNOB.r);
+  ctx.restore();
+  // light from the screen spilling onto the cabinet
+  if (info.bright > 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(SCX, SCY, 200, SCX, SCY, 820);
+    g.addColorStop(0, info.glow + (0.10 * info.bright) + ')'); g.addColorStop(1, info.glow + '0)');
+    ctx.fillStyle = g; ctx.fillRect(SCX - 900, SCY - 700, 1800, 1400); ctx.restore();
+  }
+
+  // the picture, inside the curved glass
+  ctx.save(); screenPath(ctx); ctx.clip();
+  if (before) {
+    if (info.tear > 0.02) {
+      // horizontal tearing: draw the picture in strips pushed sideways
+      const strip = 6, f = Math.floor(t * 30);
+      ctx.drawImage(BUF, SC.x0, SC.y0, SW, SH);                       // base copy so shifted strips never expose black
+      for (let y = 0; y < SH; y += strip) {
+        const off = (Math.sin(y * 0.05 + t * 9) * 6 + Math.sin(y * 0.31 + f) * 3 + (rng(f * 997 + y)() < 0.04 ? 40 : 0)) * info.tear;
+        const sy = ((y + info.roll) % SH + SH) % SH;
+        ctx.drawImage(BUF, 0, sy * 2, SW * 2, Math.min(strip, SH - sy) * 2, SC.x0 + off, SC.y0 + y, SW, Math.min(strip, SH - sy));
+      }
+    } else if (info.roll) {
+      const r = info.roll;
+      ctx.drawImage(BUF, 0, 0, SW * 2, (SH - r) * 2, SC.x0, SC.y0 + r, SW, SH - r);
+      ctx.drawImage(BUF, 0, (SH - r) * 2, SW * 2, r * 2, SC.x0, SC.y0, SW, r);
+    } else ctx.drawImage(BUF, SC.x0, SC.y0, SW, SH);
+  } else {
+    // signal locked: clean picture drawn directly so it stays sharp all the way in
+    ctx.save(); ctx.translate(SC.x0, SC.y0); navyBg(ctx, SW, SH); ctx.restore();
+    const pop = t < T.lock + 0.25 ? 1 + 0.06 * (1 - P(t, T.lock, 0.25)) : 1;     // tiny brightness pop on lock
+    if (clean < 1) {
+      // CRT phosphor bloom on the logo, fading as we pass through
+      ctx.save(); ctx.globalAlpha = 0.35 * (1 - clean) * pop; ctx.globalCompositeOperation = 'lighter'; ctx.filter = `blur(${4}px)`;
+      ctx.drawImage(logo, SCX - LOGO_W / 2, SCY - LOGO_H / 2, LOGO_W, LOGO_H); ctx.restore();
+    }
+    ctx.drawImage(logo, SCX - LOGO_W / 2, SCY - LOGO_H / 2, LOGO_W, LOGO_H);   // original artwork, untouched
+  }
+  // CRT texture: scanlines, curvature shading, glass reflection (all fade during the pass-through)
+  const crt = 1 - clean;
+  if (crt > 0 && info.bright >= 0) {
+    ctx.fillStyle = `rgba(0,0,0,${0.22 * crt})`;
+    for (let y = SC.y0; y < SC.y1; y += 3) ctx.fillRect(SC.x0 - 20, y, SW + 40, 1.2);
+    const v = ctx.createRadialGradient(SCX, SCY, SH * 0.35, SCX, SCY, SW * 0.62);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${0.55 * crt})`);
+    ctx.fillStyle = v; ctx.fillRect(SC.x0 - 20, SC.y0 - 20, SW + 40, SH + 40);
+    // warm reflection of the studio light on the upper right of the glass
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    const rx = 905 + (cx - 700) * 0.08, ry = 195;
+    const rg = ctx.createRadialGradient(rx, ry, 4, rx, ry, 120);
+    rg.addColorStop(0, `rgba(255,214,170,${0.55 * crt})`); rg.addColorStop(1, 'rgba(255,214,170,0)');
+    ctx.translate(rx, ry); ctx.scale(1.6, 0.45); ctx.translate(-rx, -ry);
+    ctx.fillStyle = rg; ctx.fillRect(rx - 200, ry - 200, 400, 400); ctx.restore();
+    const gl = ctx.createLinearGradient(SC.x0, SC.y0, SC.x1, SC.y1);
+    gl.addColorStop(0, `rgba(255,255,255,${0.05 * crt})`); gl.addColorStop(0.45, 'rgba(255,255,255,0)'); gl.addColorStop(1, `rgba(255,255,255,${0.03 * crt})`);
+    ctx.fillStyle = gl; ctx.fillRect(SC.x0, SC.y0, SW, SH);
+  }
+  ctx.restore();
+
+  // passing through the glass: a soft light sweep across the frame
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const pk = P(t, 8.75, 0.75);
+  if (pk > 0 && pk < 1) {
+    const a = Math.sin(pk * Math.PI);
+    const sg = ctx.createLinearGradient(lerp(-600, W + 600, eIO(pk)) - 500, 0, lerp(-600, W + 600, eIO(pk)) + 500, H);
+    sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, `rgba(220,235,255,${0.16 * a})`); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+  }
+  // studio vignette (only while we are looking at the TV)
+  const va = 0.65 * (1 - clean);
+  if (va > 0) { const v = ctx.createRadialGradient(W / 2, H / 2, 500, W / 2, H / 2, 1250); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${va})`); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H); }
+  // fades
+  const fi = 1 - P(t, 0, 0.5); if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
+  const fo = P(t, DURATION - 0.6, 0.6); if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${eIn(fo) * 0.4 + fo * 0.6})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.DURATION = DURATION;
+window.ready = Promise.all([tv, logo].map(i => new Promise(r => i.complete ? r() : (i.onload = r)))).then(() => { buildAssets(); render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
