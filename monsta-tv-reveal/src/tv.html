@@ -34,7 +34,7 @@ const ZF = 3.0;                                   // final zoom: frame = 640x360
 const LOGO_W = 880 / ZF, LOGO_H = LOGO_W * 242 / 800;   // logo is 880px wide in the final frame
 
 // ---------- assets ----------
-const tv = new Image(); tv.src = '../assets/img/tv.webp';
+const tv = new Image(); tv.src = '../assets/img/tv-fixed.webp';   // dial numbers repaired by src/fix_dial.py
 const logo = new Image(); logo.src = '../assets/img/monsta-logo.png';
 let PLATE, PLATE_OX = 420, PLATE_OY = 260, KNOBIMG, LOGO_M, LOGO_C;
 function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
