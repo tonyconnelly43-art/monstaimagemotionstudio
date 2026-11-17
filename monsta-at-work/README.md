@@ -1,6 +1,8 @@
 # Monsta at Work — new sound design
 
-`monsta-at-work.mp4`: the supplied 15s clip (video untouched, 1280x720 24fps) with its audio replaced.
+`monsta-at-work.mp4`: the supplied 15s clip (1280x720 24fps) with its audio replaced and the ending's charcoal background recoloured to brand navy.
+
+**Navy ending:** `src/navy_bg.py` maps the low-saturation grey background (from ~10s, fading in across the dive) onto the logo banner's navy, keeping its brightness so the vignette, bokeh and floor reflection survive; reds, whites and outlines are untouched.
 
 | Time | On screen | Sound |
 |---|---|---|
@@ -20,5 +22,8 @@ Music: "Punchier 808 Bass" from 5.09s, so its quiet build sits under the work sc
 
 ```
 python3 src/sfx.py
-GAIN=3dB ./src/mix.sh
+GAIN=3dB ./src/mix.sh                      # audio onto the original video
+python3 src/navy_bg.py                    # -> build/video_navy.mp4
+cp monsta-at-work.mp4 build/with-audio.mp4
+ffmpeg -y -i build/video_navy.mp4 -i build/with-audio.mp4 -map 0:v -map 1:a -c copy -shortest monsta-at-work.mp4
 ```
