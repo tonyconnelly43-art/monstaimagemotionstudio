@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Qualitrol Style Tests</title>
+<style>
+  @font-face { font-family: "Anton"; src: url("../assets/fonts/Anton.woff2") format("woff2"); }
+  @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }
+</style>
+<script src="land.js"></script>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Qualitrol style tests, 1920x1080, 6s each. tests.html?style=1|2|3
+// 1 = Global Signal (dotted globe), 2 = Inside the Machine (circuit flythrough),
+// 3 = Fault to Fixed (diagnostic HUD). render(t) draws time t.
+const STYLE = Number(new URLSearchParams(location.search).get('style') || 1);
+const W = 1920, H = 1080, DURATION = 6.0;
+const NAVY = '#183d6e', DEEP = '#050d1f', ORANGE = '#f47b20', RED = '#d6312b', CYAN = '#5fd2ff';
+const ctx = document.getElementById('c').getContext('2d');
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const IMG = {};
+function load(n) { return new Promise(r => { const i = new Image(); i.onload = () => { IMG[n] = i; r(); }; i.src = `../assets/${n}.png`; }); }
+function text(s, x, y, o = {}) {
+  const { size = 60, weight = 900, color = '#fff', align = 'center', alpha = 1, ls = 0, italic = false, font = 'Montserrat', glow = 0, glowColor = ORANGE } = o;
+  if (alpha <= 0) return;
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.font = `${italic ? 'italic ' : ''}${weight} ${size}px "${font}"`; ctx.letterSpacing = ls + 'px';
+  ctx.textAlign = align; ctx.textBaseline = 'middle'; if (glow) { ctx.shadowColor = glowColor; ctx.shadowBlur = glow; }
+  ctx.fillStyle = color; ctx.fillText(s, x + (align === 'center' ? ls / 2 : 0), y); ctx.restore();
+}
+function logo(cx, cy, w, alpha = 1) { const h = w * IMG.logo.height / IMG.logo.width; ctx.save(); ctx.globalAlpha *= alpha; ctx.drawImage(IMG.logo, cx - w / 2, cy - h / 2, w, h); ctx.restore(); }
+function vignette(a = 0.6) { const g = ctx.createRadialGradient(W / 2, H / 2, 500, W / 2, H / 2, 1250); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${a})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+function shineSweep(x, y, w, h, k) {
+  if (k <= 0 || k >= 1) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const sx = lerp(x - 300, x + w + 300, eIO(k)), g = ctx.createLinearGradient(sx - 160, 0, sx + 160, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,220,180,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h); ctx.restore();
+}
+
+// =================== 1. GLOBAL SIGNAL ===================
+const LAND = (() => { const a = window.LAND, out = []; for (let i = 0; i < a.length; i += 2) out.push([a[i] * Math.PI / 180, a[i + 1] * Math.PI / 180]); return out; })();
+function sph(lat, lon, rot, tilt, R) {
+  const x0 = Math.cos(lat) * Math.sin(lon + rot), y0 = Math.sin(lat), z0 = Math.cos(lat) * Math.cos(lon + rot);
+  const y = y0 * Math.cos(tilt) - z0 * Math.sin(tilt), z = y0 * Math.sin(tilt) + z0 * Math.cos(tilt);
+  return [x0 * R, -y * R, z];
+}
+const CLT = [35.2, -80.8].map(v => v * Math.PI / 180);
+const CITIES = [[40.7, -74], [41.9, -87.6], [29.8, -95.4], [34, -118.2], [19.4, -99.1], [51.5, -0.1], [-23.5, -46.6], [45.5, -73.6], [47.6, -122.3]].map(c => c.map(v => v * Math.PI / 180));
+function slerpLL(a, b, f) {
+  const v = ll => [Math.cos(ll[0]) * Math.cos(ll[1]), Math.cos(ll[0]) * Math.sin(ll[1]), Math.sin(ll[0])];
+  const A = v(a), B = v(b), d = Math.acos(cl(A[0] * B[0] + A[1] * B[1] + A[2] * B[2], -1, 1)), s = Math.sin(d) || 1;
+  const p = [0, 1, 2].map(i => (Math.sin((1 - f) * d) * A[i] + Math.sin(f * d) * B[i]) / s);
+  return [Math.asin(p[2]), Math.atan2(p[1], p[0])];
+}
+function styleGlobe(t) {
+  ctx.fillStyle = DEEP; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W * 0.62, H * 0.55, 50, W * 0.62, H * 0.55, 1100);
+  bg.addColorStop(0, '#12325f'); bg.addColorStop(1, 'rgba(5,13,31,0)'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  const r0 = rng(3); for (let i = 0; i < 160; i++) { const x = r0() * W, y = r0() * H; ctx.fillStyle = `rgba(160,200,255,${0.15 + 0.35 * r0() * (0.6 + 0.4 * Math.sin(t * 2 + i))})`; ctx.fillRect(x, y, 2, 2); }
+  const push = eOut(P(t, 0, 6));
+  const R = lerp(560, 640, push), cx = W * 0.72, cy = H * 0.58 + lerp(80, 0, eOut(P(t, 0, 1.5)));
+  const rot = 1.15 + t * 0.12, tilt = 0.38;
+  // atmosphere glow
+  const at = ctx.createRadialGradient(cx, cy, R * 0.85, cx, cy, R * 1.25); at.addColorStop(0, 'rgba(70,160,255,0.35)'); at.addColorStop(1, 'rgba(70,160,255,0)');
+  ctx.fillStyle = at; ctx.beginPath(); ctx.arc(cx, cy, R * 1.25, 0, 7); ctx.fill();
+  const body = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.1, cx, cy, R);
+  body.addColorStop(0, 'rgba(40,100,180,0.55)'); body.addColorStop(1, 'rgba(8,25,60,0.85)'); ctx.fillStyle = body; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+  // graticule
+  ctx.strokeStyle = 'rgba(120,190,255,0.12)'; ctx.lineWidth = 1.2;
+  for (let la = -60; la <= 60; la += 30) { ctx.beginPath(); let on = false; for (let lo = -180; lo <= 180; lo += 4) { const [x, y, z] = sph(la * Math.PI / 180, lo * Math.PI / 180, rot, tilt, R); if (z > 0) { on ? ctx.lineTo(cx + x, cy + y) : ctx.moveTo(cx + x, cy + y); on = true; } else on = false; } ctx.stroke(); }
+  for (let lo = -180; lo < 180; lo += 30) { ctx.beginPath(); let on = false; for (let la = -90; la <= 90; la += 4) { const [x, y, z] = sph(la * Math.PI / 180, lo * Math.PI / 180, rot, tilt, R); if (z > 0) { on ? ctx.lineTo(cx + x, cy + y) : ctx.moveTo(cx + x, cy + y); on = true; } else on = false; } ctx.stroke(); }
+  // land dots
+  const reveal = eOut(P(t, 0.1, 1.4));
+  for (const [la, lo] of LAND) { const [x, y, z] = sph(la, lo, rot, tilt, R); if (z <= 0.02) continue; ctx.fillStyle = `rgba(${140 + 100 * z},${200 + 55 * z},255,${(0.25 + 0.75 * z) * reveal})`; const s = 1.4 + 2.2 * z; ctx.fillRect(cx + x - s / 2, cy + y - s / 2, s, s); }
+  // arcs from Charlotte
+  CITIES.forEach((c, i) => {
+    const st = 1.0 + i * 0.32, k = P(t, st, 0.9); if (k <= 0) return;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const pts = []; for (let f = 0; f <= 1.0001; f += 0.025) { const [la, lo] = slerpLL(CLT, c, f); const [x, y, z] = sph(la, lo, rot, tilt, R * (1 + 0.22 * Math.sin(Math.PI * f))); pts.push([cx + x, cy + y, z]); }
+    const head = Math.floor(eOut(k) * (pts.length - 1));
+    ctx.lineWidth = 3; for (let j = 1; j <= head; j++) { if (pts[j][2] < -0.1) continue; ctx.strokeStyle = `rgba(244,123,32,${0.25 + 0.75 * (j / head)})`; ctx.beginPath(); ctx.moveTo(pts[j - 1][0], pts[j - 1][1]); ctx.lineTo(pts[j][0], pts[j][1]); ctx.stroke(); }
+    const hp = pts[head]; ctx.fillStyle = '#ffd2a0'; ctx.shadowColor = ORANGE; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(hp[0], hp[1], 5, 0, 7); ctx.fill();
+    ctx.restore();
+  });
+  // Charlotte beacon
+  { const [x, y, z] = sph(CLT[0], CLT[1], rot, tilt, R); if (z > 0) { const p = (t * 1.2) % 1; ctx.strokeStyle = `rgba(244,123,32,${1 - p})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx + x, cy + y, 6 + p * 40, 0, 7); ctx.stroke(); ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(cx + x, cy + y, 7, 0, 7); ctx.fill(); } }
+  // orbit rings (front half bright, back half dim)
+  for (const [rr, tl, sp, w] of [[1.18, 0.25, 0.5, 4], [1.32, -0.18, -0.35, 2.5]]) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let a = 0; a < Math.PI * 2; a += 0.02) {
+      const x = Math.cos(a + t * sp) * R * rr, z = Math.sin(a + t * sp), y = z * R * rr * 0.22 + Math.cos(a + t * sp) * R * rr * tl * 0.3;
+      const front = z > 0, x2 = Math.cos(a + 0.025 + t * sp) * R * rr, z2 = Math.sin(a + 0.025 + t * sp), y2 = z2 * R * rr * 0.22 + Math.cos(a + 0.025 + t * sp) * R * rr * tl * 0.3;
+      if (!front && Math.hypot(x, y) < R) continue;
+      ctx.strokeStyle = `rgba(244,123,32,${front ? 0.75 : 0.25})`; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(cx + x, cy + y); ctx.lineTo(cx + x2, cy + y2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  const lg = ctx.createLinearGradient(0, 0, W * 0.55, 0); lg.addColorStop(0, 'rgba(3,9,22,0.85)'); lg.addColorStop(1, 'rgba(3,9,22,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+  vignette(0.55);
+  // logo + line
+  const k = P(t, 2.0, 0.6);
+  if (k > 0) {
+    const lw = 720, lx = 520, ly = 470; ctx.save(); ctx.translate(lx, ly); const s = lerp(1.35, 1, eOut(k)); ctx.scale(s, s);
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 30; logo(0, 0, lw, cl(k * 3)); ctx.restore();
+    shineSweep(lx - lw / 2, ly - 120, lw, 240, P(t, 2.6, 0.9));
+    const k2 = P(t, 3.3, 0.5);
+    if (k2 > 0) { ctx.fillStyle = ORANGE; ctx.fillRect(lx - 380, ly + 130, 760 * eOut(k2), 4);
+      text('INDUSTRIAL ELECTRONIC & MARPOSS GAUGE REPAIR', lx, ly + 175, { size: 30, weight: 700, ls: 4, alpha: cl(k2 * 2) }); }
+    const k3 = P(t, 4.2, 0.5);
+    if (k3 > 0) text('2-YEAR WARRANTY ON EVERY REPAIR', lx, ly + 230, { size: 40, weight: 900, italic: true, color: ORANGE, alpha: cl(k3 * 2), glow: 20 });
+  }
+}
+
+// =================== 2. INSIDE THE MACHINE ===================
+const TRACES = (() => {           // board-space traces: x in [-12,12], z in [0,80]
+  const r = rng(9), T = [];
+  for (let i = 0; i < 220; i++) {
+    let x = Math.round((r() - 0.5) * 28), z = r() * 120; const pts = [[x, z]];
+    for (let s = 0; s < 8; s++) { if (r() < 0.5) z += 2 + r() * 8; else { const dx = (r() < 0.5 ? -1 : 1) * (1 + Math.round(r() * 3)); x += dx; z += Math.abs(dx); } pts.push([x, z]); }
+    T.push({ pts, ph: r(), sp: 0.4 + r() * 0.6, hot: r() < 0.45 });
+  }
+  return T;
+})();
+const CHIPS = (() => { const r = rng(21); return Array.from({ length: 60 }, () => ({ x: (r() - 0.5) * 26, z: r() * 120, w: 1 + r() * 2.5, d: 1 + r() * 3 })); })();
+function styleCircuit(t) {
+  ctx.fillStyle = '#020814'; ctx.fillRect(0, 0, W, H);
+  const camZ = t * 6, horizon = 300;
+  const proj = (x, z) => { const dz = z - camZ; if (dz < 0.5) return null; return [W / 2 + x * 170 / dz, horizon + 760 / dz]; };
+  // board glow
+  const g = ctx.createLinearGradient(0, horizon, 0, H); g.addColorStop(0, 'rgba(10,40,80,0)'); g.addColorStop(1, 'rgba(18,61,110,0.55)'); ctx.fillStyle = g; ctx.fillRect(0, horizon, W, H - horizon);
+  // grid
+  ctx.strokeStyle = 'rgba(95,210,255,0.08)'; ctx.lineWidth = 1;
+  for (let x = -14; x <= 14; x += 2) { const a = proj(x, camZ + 0.7), b = proj(x, camZ + 90); if (a && b) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); } }
+  for (let z = Math.ceil(camZ / 4) * 4; z < camZ + 90; z += 4) { const a = proj(-14, z), b = proj(14, z); if (a && b) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); } }
+  // chips
+  for (const c of CHIPS) {
+    const cs = [[c.x, c.z], [c.x + c.w, c.z], [c.x + c.w, c.z + c.d], [c.x, c.z + c.d]].map(p => proj(p[0], p[1])); if (cs.some(p => !p)) continue;
+    const fade = cl(1 - (c.z - camZ) / 60); ctx.fillStyle = `rgba(10,22,40,${0.9 * fade})`; ctx.strokeStyle = `rgba(95,210,255,${0.35 * fade})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); cs.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  // traces + current pulses
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const tr of TRACES) {
+    const pp = tr.pts.map(p => proj(p[0], p[1]));
+    const dz = tr.pts[0][1] - camZ, fade = cl(1 - (dz - 4) / 26);       // far traces fade out (no hotspot at the horizon)
+    if (fade <= 0) continue;
+    ctx.lineWidth = 2.5; ctx.strokeStyle = `rgba(95,210,255,${0.3 * fade})`; ctx.beginPath(); let on = false;
+    pp.forEach(p => { if (!p) { on = false; return; } on ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); on = true; }); ctx.stroke();
+    if (!tr.hot) continue;
+    const k = (t * tr.sp + tr.ph) % 1, seg = k * (pp.length - 1), i = Math.floor(seg), a = pp[i], b = pp[i + 1];
+    if (a && b && fade > 0.15) { const x = lerp(a[0], b[0], seg - i), y = lerp(a[1], b[1], seg - i); ctx.globalAlpha = fade; ctx.fillStyle = ORANGE; ctx.shadowColor = ORANGE; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+  }
+  ctx.restore();
+  // depth fog: the board fades into darkness toward the horizon
+  const fog = ctx.createLinearGradient(0, horizon - 40, 0, horizon + 330);
+  fog.addColorStop(0, 'rgba(2,8,20,1)'); fog.addColorStop(0.45, 'rgba(2,8,20,0.85)'); fog.addColorStop(1, 'rgba(2,8,20,0)');
+  ctx.fillStyle = fog; ctx.fillRect(0, 0, W, horizon + 330);
+  vignette(0.5);
+  // product assembles: blueprint -> photo
+  const k = P(t, 1.6, 2.4);
+  if (k > 0) {
+    const im = IMG.drive, ed = IMG['drive-edges'], h = 700, w = h * im.width / im.height, x = 1150, y = 170 + (1 - eOut(P(t, 1.6, 0.6))) * 60;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const scanY = y + h * eOut(cl(k / 0.55));
+    ctx.save(); ctx.beginPath(); ctx.rect(x - 20, y - 20, w + 40, scanY - y + 20); ctx.clip(); ctx.globalAlpha = 1 - P(t, 3.3, 0.6) * 0.75; ctx.shadowColor = CYAN; ctx.shadowBlur = 14; for (let i = 0; i < 3; i++) ctx.drawImage(ed, x, y, w, h); ctx.restore();
+    if (k < 0.6) { ctx.fillStyle = 'rgba(95,210,255,0.9)'; ctx.shadowColor = CYAN; ctx.shadowBlur = 25; ctx.fillRect(x - 30, scanY - 2, w + 60, 4); }
+    ctx.restore();
+    const fill = P(t, 2.7, 0.8);                                   // photo wipes in bottom-up
+    if (fill > 0) { const fy = y + h * (1 - eOut(fill)); ctx.save(); ctx.beginPath(); ctx.rect(x - 5, fy, w + 10, h - (fy - y) + 5); ctx.clip(); ctx.drawImage(im, x, y, w, h); ctx.restore(); }
+    // callout lines + label
+    const lk = P(t, 3.2, 0.5);
+    if (lk > 0) {
+      ctx.strokeStyle = ORANGE; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 20, y + 180); ctx.lineTo(x - 20 - 220 * eOut(lk), y + 180); ctx.stroke();
+      ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(x - 20, y + 180, 7, 0, 7); ctx.fill();
+      text('VARIABLE', 820, y + 150, { size: 76, italic: true, alpha: lk, align: 'right' });
+      text('FREQUENCY DRIVES', 820, y + 225, { size: 52, italic: true, color: ORANGE, alpha: lk, align: 'right' });
+      text('ABB · ALLEN BRADLEY · SIEMENS · YASKAWA · +40 MORE', 820, y + 285, { size: 22, weight: 700, ls: 2, alpha: P(t, 3.5, 0.5) * 0.85, align: 'right', color: '#bcd6f5' });
+    }
+  }
+  // warranty LED badge
+  const wk = P(t, 4.5, 0.4);
+  if (wk > 0) {
+    const bx = 470, by = 880, s = eBack(wk);
+    ctx.save(); ctx.translate(bx, by); ctx.scale(s, s);
+    ctx.shadowColor = ORANGE; ctx.shadowBlur = 40 + 20 * Math.sin(t * 8);
+    ctx.fillStyle = '#0b1c36'; ctx.strokeStyle = ORANGE; ctx.lineWidth = 5; ctx.beginPath(); ctx.roundRect(-330, -55, 660, 110, 55); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(-270, 0, 16, 0, 7); ctx.fill();
+    text('2-YEAR WARRANTY', 30, 2, { size: 54, italic: true });
+    ctx.restore();
+  }
+  logo(230, 90, 340, P(t, 0.3, 0.6));
+}
+
+// =================== 3. FAULT TO FIXED ===================
+const ROWS = ['VARIABLE FREQUENCY DRIVES', 'PLC CONTROLLERS', 'SERVO & SPINDLE MOTORS', 'ROBOTIC CONTROLS'];
+function styleHUD(t) {
+  const fixK = eIO(P(t, 2.1, 0.5));                  // 0 = fault (red), 1 = Qualitrol (navy/orange)
+  const mix = (a, b) => `rgb(${a.map((v, i) => Math.round(lerp(v, b[i], fixK))).join(',')})`;
+  const bgc = mix([26, 4, 6], [5, 13, 31]), acc = mix([230, 40, 40], [244, 123, 32]), line = fixK < 0.5 ? 'rgba(255,60,60,' : 'rgba(95,180,255,';
+  ctx.fillStyle = bgc; ctx.fillRect(0, 0, W, H);
+  // grid + scanlines
+  ctx.strokeStyle = line + '0.10)'; ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y <= H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  // frame brackets
+  ctx.strokeStyle = acc; ctx.lineWidth = 5;
+  for (const [x, y, dx, dy] of [[60, 60, 1, 1], [W - 60, 60, -1, 1], [60, H - 60, 1, -1], [W - 60, H - 60, -1, -1]]) { ctx.beginPath(); ctx.moveTo(x, y + dy * 80); ctx.lineTo(x, y); ctx.lineTo(x + dx * 80, y); ctx.stroke(); }
+  // waveform
+  ctx.strokeStyle = acc; ctx.lineWidth = 3; ctx.globalAlpha = 0.8; ctx.beginPath();
+  for (let x = 120; x < W - 120; x += 4) {
+    const fault = (1 - fixK) * (Math.sin(x * 0.05 + t * 30) * 60 * (rng(Math.floor(x / 40) + Math.floor(t * 12))() > 0.6 ? 1 : 0.1));
+    const ok = fixK * Math.sin(x * 0.012 - t * 4) * 40;
+    const y = 900 + fault + ok; x === 120 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.globalAlpha = 1;
+  if (t < 2.1) {
+    const blink = Math.floor(t * 4) % 2 === 0;
+    text('⚠ FAULT DETECTED', W / 2, 330, { size: 120, italic: true, color: blink ? '#ff3b30' : '#a8201b', glow: blink ? 40 : 0, glowColor: '#ff3b30', alpha: P(t, 0, 0.15) });
+    text('PRODUCTION LINE 3 — DOWN', W / 2, 450, { size: 44, weight: 800, ls: 6, color: '#ffb3ad', alpha: P(t, 0.3, 0.3) });
+    const secs = Math.floor(lerp(0, 5400, eIO(P(t, 0.3, 1.7))));
+    const hh = String(Math.floor(secs / 3600)).padStart(2, '0'), mm = String(Math.floor(secs / 60) % 60).padStart(2, '0'), ss = String(secs % 60).padStart(2, '0');
+    text('DOWNTIME', W / 2, 600, { size: 34, weight: 700, ls: 10, color: '#ff6b63', alpha: P(t, 0.4, 0.3) });
+    text(`${hh}:${mm}:${ss}`, W / 2, 700, { size: 130, font: 'Anton', weight: 400, color: '#fff', ls: 8, alpha: P(t, 0.4, 0.3) });
+    const cost = Math.floor(lerp(0, 22500, eIO(P(t, 0.3, 1.7))));
+    text(`LOST OUTPUT: $${cost.toLocaleString('en-US')}`, W / 2, 800, { size: 36, weight: 800, ls: 3, color: '#ff8a80', alpha: P(t, 0.6, 0.3) });
+  }
+  // glitch transition
+  const gk = P(t, 1.95, 0.45);
+  if (gk > 0 && gk < 1) {
+    const r = rng(Math.floor(t * 60));
+    for (let i = 0; i < 14; i++) { const y = r() * H, h = 10 + r() * 60; ctx.drawImage(ctx.canvas, 0, y, W, h, (r() - 0.5) * 120, y, W, h); }
+    ctx.fillStyle = `rgba(255,255,255,${0.35 * Math.sin(gk * Math.PI)})`; ctx.fillRect(0, 0, W, H);
+  }
+  if (t >= 2.2) {
+    const lk = P(t, 2.2, 0.4);
+    ctx.save(); ctx.translate(W / 2, 175); const s = lerp(1.3, 1, eOut(lk)); ctx.scale(s, s); logo(0, 0, 560, lk); ctx.restore();
+    ROWS.forEach((name, i) => {
+      const st = 2.7 + i * 0.45, k = P(t, st, 0.3); if (k <= 0) return;
+      const y = 390 + i * 105, done = t > st + 0.35;
+      ctx.save(); ctx.globalAlpha = cl(k * 2); ctx.translate((1 - eOut(k)) * -80, 0);
+      ctx.fillStyle = 'rgba(24,61,110,0.55)'; ctx.strokeStyle = 'rgba(95,180,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(360, y - 40, 1200, 80, 10); ctx.fill(); ctx.stroke();
+      text(name, 400, y + 2, { size: 38, weight: 800, align: 'left', ls: 2 });
+      const bar = cl((t - st) / 0.35); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(1090, y - 6, 220, 12); ctx.fillStyle = ORANGE; ctx.fillRect(1090, y - 6, 220 * bar, 12);
+      text(done ? 'ONLINE ✓' : 'REPAIRING', 1530, y + 2, { size: 34, weight: 900, align: 'right', color: done ? '#4cd964' : ORANGE, glow: done ? 18 : 0, glowColor: '#4cd964' });
+      ctx.restore();
+    });
+    const wk = P(t, 4.7, 0.35);
+    if (wk > 0) {
+      ctx.save(); ctx.translate(W / 2, 880); ctx.scale(eBack(wk), eBack(wk));
+      ctx.fillStyle = ORANGE; ctx.shadowColor = ORANGE; ctx.shadowBlur = 35; ctx.beginPath(); ctx.roundRect(-480, -55, 960, 110, 12); ctx.fill(); ctx.shadowBlur = 0;
+      text('SYSTEM RESTORED · 2-YEAR WARRANTY', 0, 3, { size: 46, italic: true, ls: 1 });
+      ctx.restore();
+    }
+  }
+  // CRT scanlines over everything
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 2);
+  vignette(0.55);
+}
+
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.letterSpacing = '0px';
+  [null, styleGlobe, styleCircuit, styleHUD][STYLE](t);
+  // label
+  ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(W - 470, H - 82, 430, 52, 10); ctx.fill();
+  text(`STYLE TEST ${STYLE} · ${['', 'GLOBAL SIGNAL', 'INSIDE THE MACHINE', 'FAULT TO FIXED'][STYLE]}`, W - 255, H - 55, { size: 20, weight: 800, ls: 2 }); ctx.restore();
+  const fi = 1 - P(t, 0, 0.3); if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
+  const fo = P(t, DURATION - 0.3, 0.3); if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+window.DURATION = DURATION;
+window.ready = Promise.all(['logo', 'drive', 'drive-edges'].map(load).concat([document.fonts.load('900 60px "Montserrat"'), document.fonts.load('italic 900 60px "Montserrat"'), document.fonts.load('700 60px "Montserrat"'), document.fonts.load('400 60px "Anton"')])).then(() => { render(0); return true; });
+if (location.hash === '#play') { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+</script>
+</body>
+</html>
