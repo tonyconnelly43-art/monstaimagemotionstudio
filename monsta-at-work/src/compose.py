@@ -1,5 +1,5 @@
 """Final 1080p video: the navy-recoloured clip upscaled, then at ~12.5s a shine-sweep
-switch to a clean plate with the real logo files (build/final_logo.png): navy gradient
+switch (after his wink) to a clean plate with the real logo files (build/final_logo.png): navy gradient
 and floor sampled from the clip, floor reflection of the real logo, drifting particles,
 and the clip's slow camera pull-back. Writes build/video_final.mp4 (no audio)."""
 import subprocess
@@ -8,7 +8,8 @@ import numpy as np
 from PIL import Image, ImageFilter
 root = Path(__file__).resolve().parent.parent
 W, H, FPS = 1920, 1080, 24
-SW0, SW1 = 12.45, 12.75                    # crossfade window (shine sweep 12.45-13.15)
+SW0, SW1 = 14.45, 14.75                    # crossfade window, right after his wink + thumbs-up (13.5-14.3s)
+END = 17.0                                 # hold on the real logo past the clip's end (15.04s)
 ZC = (983, 564)                            # pull-back centre (1080p), measured from the clip
 FLOOR = 622 * 1.5                          # mascot feet / floor line
 
@@ -76,8 +77,11 @@ while True:
     f = np.frombuffer(buf, np.uint8).reshape(H, W, 3).astype(np.float32)
     m = min(1, (t - SW0) / (SW1 - SW0)); m = m * m * (3 - 2 * m)
     out = f * (1 - m) + final_frame(t) * m
-    fl = max(0, 1 - abs(t - 12.6) / 0.12) * 0.15          # soft flash at the switch
+    fl = max(0, 1 - abs(t - (SW0 + 0.15)) / 0.12) * 0.15          # soft flash at the switch
     out = out + (255 - out) * fl
     enc.stdin.write(out.clip(0, 255).astype(np.uint8).tobytes())
+while n < int(END * FPS):                   # extended hold: real logo only
+    t = n / FPS; n += 1
+    enc.stdin.write(final_frame(t).clip(0, 255).astype(np.uint8).tobytes())
 enc.stdin.close(); enc.wait(); dec.wait()
 print('frames', n)
