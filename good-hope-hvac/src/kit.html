@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Good Hope Brand Kit</title>
+<style>
+  @font-face { font-family: "Montserrat"; src: url("../assets/fonts/Montserrat.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Good Hope HVAC social brand kit. kit.html?scene=intro&format=h|v
+// h = 1920x1080 (16:9), v = 1080x1920 (9:16). render(t) draws time t.
+const Q = new URLSearchParams(location.search);
+const SCENE = Q.get('scene') || 'intro', FORMAT = Q.get('format') || 'h';
+const W = FORMAT === 'v' ? 1080 : 1920, H = FORMAT === 'v' ? 1920 : 1080, V = FORMAT === 'v';
+const DURATION = { intro: 3.5 }[SCENE];
+const PURPLE = '#43328a', GOLD = '#f6a623', TEAL = '#1fa7bf', OUTLINE = '#6c7fbb';
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const ctx = cv.getContext('2d');
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, s, d) => cl((t - s) / d);
+const lerp = (a, b, x) => a + (b - a) * x;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIn = x => x * x * x;
+const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const IMG = {};
+const load = (n, f) => new Promise(r => { const i = new Image(); i.onload = () => { IMG[n] = i; r(); }; i.src = `../assets/${f}`; });
+
+// ---------- background: client sky/cloud art, extended upward with matching sky ----------
+const SKY_CROP = { x: 33, y: 612, w: 1943, h: 765 };   // opaque band inside clouds.png
+function sky(t, push = 0) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#6fbcd6'); g.addColorStop(V ? 0.5 : 0.3, '#cfe9f2'); g.addColorStop(1, '#d6edf4');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // band covers the lower part of frame; scale to cover width (vertical: taller band)
+  const bh = V ? H * 0.52 : H * 0.72, bw = Math.max(W, bh * SKY_CROP.w / SKY_CROP.h);
+  const s = 1 + push * 0.06, w = bw * s, h = bh * s;
+  ctx.drawImage(IMG.clouds, SKY_CROP.x, SKY_CROP.y, SKY_CROP.w, SKY_CROP.h, (W - w) / 2, H - h + push * 20, w, h);
+  // soften the seam where the band's sky meets the extension
+  const y0 = H - h + push * 20, f = ctx.createLinearGradient(0, y0, 0, y0 + 200);
+  f.addColorStop(0, '#d6edf4'); f.addColorStop(1, 'rgba(214,237,244,0)');
+  ctx.fillStyle = f; ctx.fillRect(0, y0 - 2, W, 202);
+}
+
+// ---------- heavenly light rays behind the logo ----------
+function rays(cx, cy, k, t) {
+  if (k <= 0) return;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.12); ctx.globalCompositeOperation = 'screen';
+  const R = Math.hypot(W, H), n = 16;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, wdt = 0.07 + 0.04 * (i % 3);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.7);
+    g.addColorStop(0, `rgba(255,226,140,${0.32 * k})`); g.addColorStop(1, 'rgba(255,226,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a - wdt, a + wdt); ctx.closePath(); ctx.fill();
+  }
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 620);
+  glow.addColorStop(0, `rgba(255,246,215,${0.7 * k})`); glow.addColorStop(1, 'rgba(255,248,220,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 700, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// ---------- puffy clouds in the art's style (white fill, lavender shading, blue-violet outline) ----------
+function makeBank(seed, side) {
+  const r = rng(seed), puffs = [];
+  const cols = V ? 5 : 7, rows = V ? 9 : 5;
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const x = (i / (cols - 1)) * (W * 0.62) * (side < 0 ? 1 : -1) + (side < 0 ? 0 : W);
+    puffs.push({ x: x + (r() - 0.5) * 140, y: (j / (rows - 1)) * (H + 200) - 100 + (r() - 0.5) * 120, r: (V ? 170 : 160) + r() * 120 });
+  }
+  return puffs;
+}
+const BANKS = [makeBank(11, -1), makeBank(29, 1)];
+function cloudBank(puffs, dx, dy) {
+  ctx.save(); ctx.translate(dx, dy);
+  ctx.fillStyle = OUTLINE;
+  for (const p of puffs) { ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#ddd9f0';   // lavender body: shows as crescents on the lower-right rims
+  for (const p of puffs) { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#ffffff';
+  for (const p of puffs) { ctx.beginPath(); ctx.arc(p.x - p.r * 0.1, p.y - p.r * 0.16, p.r * 0.86, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+
+// ---------- logo (drawn untouched; effects are composited on top, masked to its alpha) ----------
+let shineCv;
+function logo(cx, cy, w, alpha, shineK) {
+  const h = w * IMG.logo.height / IMG.logo.width;
+  ctx.save(); ctx.globalAlpha *= alpha;
+  ctx.shadowColor = 'rgba(40,30,110,0.35)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 18;
+  ctx.drawImage(IMG.logo, cx - w / 2, cy - h / 2, w, h);
+  ctx.restore();
+  if (shineK > 0 && shineK < 1) {
+    shineCv = shineCv || document.createElement('canvas');
+    shineCv.width = Math.ceil(w); shineCv.height = Math.ceil(h);
+    const s = shineCv.getContext('2d');
+    s.clearRect(0, 0, w, h); s.globalCompositeOperation = 'source-over'; s.drawImage(IMG.logo, 0, 0, w, h);
+    s.globalCompositeOperation = 'source-in';
+    const sx = lerp(-0.4 * w, 1.4 * w, eIO(shineK)), g = s.createLinearGradient(sx - 140, 0, sx + 140, h * 0.3);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,240,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    s.fillStyle = g; s.fillRect(0, 0, w, h);
+    ctx.save(); ctx.globalAlpha *= alpha; ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(shineCv, cx - w / 2, cy - h / 2); ctx.restore();
+  }
+  return h;
+}
+
+// golden halo ring that pulses out from behind the logo when it lands
+function haloRing(cx, cy, k, baseW) {
+  if (k <= 0 || k >= 1) return;
+  const rx = lerp(baseW * 0.35, baseW * (V ? 0.6 : 0.95), eOut(k)), ry = rx * 0.32;
+  ctx.save(); ctx.globalAlpha = (1 - k) * 0.95;
+  ctx.lineWidth = lerp(26, 4, k); ctx.strokeStyle = GOLD; ctx.shadowColor = '#ffd36b'; ctx.shadowBlur = 30;
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.stroke();
+  ctx.lineWidth *= 0.35; ctx.strokeStyle = '#fff3c4'; ctx.shadowBlur = 0; ctx.stroke();
+  ctx.restore();
+}
+
+function sparkle(x, y, s, a) {
+  if (a <= 0) return;
+  ctx.save(); ctx.translate(x, y); ctx.globalAlpha = a; ctx.fillStyle = '#fffbe8'; ctx.shadowColor = '#ffd36b'; ctx.shadowBlur = 14;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) { const r = i % 2 ? s * 0.22 : s, an = i * Math.PI / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+const SPARKS = (() => { const r = rng(7), a = []; for (let i = 0; i < 18; i++) a.push({ a: r() * Math.PI * 2, d: 0.42 + r() * 0.35, s: 10 + r() * 18, t0: 1.25 + r() * 1.6, life: 0.5 + r() * 0.5 }); return a; })();
+
+// =================== INTRO STING (3.5s) ===================
+function intro(t) {
+  const logoW = V ? 860 : 1060, cx = W / 2, cy = V ? H * 0.47 : H * 0.5;
+  sky(t, eOut(P(t, 0, 3.5)));
+  rays(cx, cy, eOut(P(t, 0.35, 0.9)) * lerp(1, 0.75, P(t, 1.6, 1.5)), t);
+
+  // logo pops in as the clouds open
+  const pk = P(t, 0.7, 0.75), s = eBack(pk);
+  const float = Math.sin(Math.max(0, t - 1.45) * 2.2) * 6 * P(t, 1.45, 0.4);
+  haloRing(cx, cy, P(t, 1.05, 0.8), logoW);
+  if (pk > 0) logo(cx, cy + lerp(60, 0, eOut(pk)) + float, logoW * lerp(0.55, 1, s), cl(pk * 3), P(t, 1.55, 0.9));
+
+  for (const p of SPARKS) {
+    const k = P(t, p.t0, p.life); if (k <= 0 || k >= 1) continue;
+    const rx = logoW * p.d, ry = logoW * p.d * (V ? 0.75 : 0.5);
+    sparkle(cx + Math.cos(p.a) * rx, cy + Math.sin(p.a) * ry, p.s * Math.sin(k * Math.PI), Math.sin(k * Math.PI));
+  }
+
+  // foreground clouds part (left bank goes left, right bank goes right)
+  const open = lerp(0.12, 1, eIO(P(t, 0.05, 1.15))), dist = W * 0.62 + 520;
+  cloudBank(BANKS[0], -open * dist, open * 40);
+  cloudBank(BANKS[1], open * dist, open * 40);
+
+  // white flash on landing
+  const fl = P(t, 1.05, 0.35); if (fl > 0 && fl < 1) { ctx.fillStyle = `rgba(255,255,250,${0.45 * (1 - fl)})`; ctx.fillRect(0, 0, W, H); }
+  // fade-in from white at the very start
+  if (t < 0.2) { ctx.fillStyle = `rgba(255,255,255,${1 - t / 0.2})`; ctx.fillRect(0, 0, W, H); }
+}
+
+function render(t) { ({ intro })[SCENE](t); }
+window.DURATION = DURATION;
+window.ready = Promise.all([load('logo', 'logo-wordmark.png'), load('clouds', 'clouds.png'), document.fonts.load('900 40px Montserrat')]);
+</script>
+</body>
+</html>
