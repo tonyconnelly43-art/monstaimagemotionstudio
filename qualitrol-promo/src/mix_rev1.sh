@@ -7,7 +7,7 @@
 #   PLC       13.15 - 18.85   16.3
 #   HMI       19.20 - 23.70   24.7
 #   warranty  24.10 - 32.80   32.1   (checks land on "evaluated" 32.2, "load tested" 33.95, "18-month" 35.7, "shelf life" 38.2)
-#   close     33.15 - 40.12   41.6
+#   close     33.15 - 40.12   41.6   (CLOSE_END=34.70 keeps only "Qualitrol International.", used for the Roddy Knox end card)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VIDEO=${VIDEO:-build/rev1_video.mp4}; OUT=${OUT:-qualitrol-rev1-vfd-plc-hmi.mp4}
@@ -18,7 +18,7 @@ ffmpeg -y -loglevel error -i assets/audio/vo-rev1.mp3 -i assets/audio/bed-rev1.w
 [a3]atrim=13.15:18.85,asetpts=PTS-STARTPTS,afade=t=in:d=0.04,adelay=16300|16300[l3];
 [a4]atrim=19.20:23.70,asetpts=PTS-STARTPTS,afade=t=in:d=0.04,adelay=24700|24700[l4];
 [a5]atrim=24.10:32.80,asetpts=PTS-STARTPTS,afade=t=in:d=0.04,adelay=32100|32100[l5];
-[a6]atrim=33.15:40.12,asetpts=PTS-STARTPTS,afade=t=in:d=0.04,adelay=41600|41600[l6];
+[a6]atrim=33.15:${CLOSE_END:-40.12},asetpts=PTS-STARTPTS,afade=t=in:d=0.04,areverse,afade=t=in:d=0.12,areverse,adelay=41600|41600[l6];
 [l1][l2][l3][l4][l5][l6]amix=inputs=6:normalize=0:duration=longest,highpass=f=80,acompressor=threshold=-20dB:ratio=3:attack=5:release=120:makeup=2,apad=whole_dur=50[vo];
 [vo]asplit=2[vo1][vokey];
 [1:a]aresample=48000,volume=${BED:-0.55}[bed];

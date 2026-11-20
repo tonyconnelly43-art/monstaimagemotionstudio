@@ -27,10 +27,10 @@ if (args[0] === '--stills') {
 } else {
   const out = args[0], fps = Number(args[1] || 30);
   const duration = await page.evaluate(() => window.DURATION);
-  const n = Math.round(duration * fps);
+  const n = Math.round(duration * fps), i0 = Math.round(Number(process.env.START || 0) * fps);   // START=s renders only from s
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'inherit', 'inherit'] });
-  for (let i = 0; i < n; i++) {
+  for (let i = i0; i < n; i++) {
     await page.evaluate(t => render(t), i / fps);
     const buf = await canvas.screenshot({ type: 'jpeg', quality: 95 });
     if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));

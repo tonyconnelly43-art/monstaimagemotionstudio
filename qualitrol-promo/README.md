@@ -56,3 +56,16 @@ The style test's "2-Year Warranty" line is left out. Style test 1 itself is unch
 STYLE=4 node src/render.mjs build/rev2_video.mp4 30
 VIDEO=build/rev2_video.mp4 OUT=qualitrol-rev2-globe-open.mp4 ./src/mix_rev1.sh
 ```
+
+## Revision 3: Roddy Knox end card (50s)
+
+`qualitrol-rev3-roddy-knox.mp4`: revision 2 with the end card showing Roddy Knox · 704-962-7497 · rknox@qualitrol.com
+(plus qualitrol.com) instead of the main company number. No new recording: the voiceover now ends on
+"Qualitrol International." (`CLOSE_END=34.70`), cutting the spoken company number; the music plays out under the card.
+Only the changed tail was re-rendered (`START=40` in `src/render.mjs`) and spliced onto the revision 2 picture.
+
+```
+START=40 STYLE=4 node src/render.mjs build/end_roddy.mp4 30
+ffmpeg -i build/rev2_video.mp4 -i build/end_roddy.mp4 -filter_complex "[0:v]trim=0:40,setpts=PTS-STARTPTS[a];[1:v]setpts=PTS-STARTPTS[b];[a][b]concat=n=2:v=1[v]" -map "[v]" -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p build/rev3_video.mp4
+CLOSE_END=34.70 VIDEO=build/rev3_video.mp4 OUT=qualitrol-rev3-roddy-knox.mp4 ./src/mix_rev1.sh
+```

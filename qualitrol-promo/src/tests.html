@@ -467,9 +467,14 @@ function warrantyEnd(t) {
   ctx.restore();
   // end card: logo moves to centre, contact line underneath
   const ek = eIO(P(t, END + 0.3, 1.0));
-  if (ek > 0) logo(lerp(230, W / 2, ek), lerp(90, 450, ek), lerp(340, 1100, ek));
-  text('704-702-6380  ·  QUALITROL.COM', W / 2, 760, { size: 54, weight: 800, ls: 4, alpha: P(t, END + 1.2, 0.6) });
-  text('REPAIRED · TESTED · WARRANTIED', W / 2, 850, { size: 26, weight: 800, ls: 8, color: ORANGE, alpha: P(t, END + 1.8, 0.6) });
+  if (ek > 0) logo(lerp(230, W / 2, ek), lerp(90, 360, ek), lerp(340, 980, ek));
+  // contact: Roddy Knox (client contact), replaces the main company number
+  const ck = P(t, END + 1.2, 0.6);
+  if (ck > 0) { ctx.save(); ctx.globalAlpha = ck; ctx.fillStyle = ORANGE; ctx.fillRect(W / 2 - 300 * eOut(ck), 585, 600 * eOut(ck), 4); ctx.restore(); }
+  text('RODDY KNOX', W / 2, 660, { size: 72, italic: true, ls: 2, alpha: ck });
+  text('704-962-7497', W / 2, 752, { size: 50, weight: 800, ls: 4, alpha: P(t, END + 1.6, 0.6) });
+  text('RKNOX@QUALITROL.COM', W / 2, 822, { size: 38, weight: 700, ls: 4, color: '#bcd6f5', alpha: P(t, END + 1.9, 0.6) });
+  text('QUALITROL.COM  ·  REPAIRED · TESTED · WARRANTIED', W / 2, 920, { size: 24, weight: 800, ls: 6, color: ORANGE, alpha: P(t, END + 2.4, 0.6) });
 }
 
 function styleLineup(t) {
