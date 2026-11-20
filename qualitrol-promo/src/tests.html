@@ -17,7 +17,7 @@
 // 1 = Global Signal (dotted globe), 2 = Inside the Machine (circuit flythrough),
 // 3 = Fault to Fixed (diagnostic HUD). render(t) draws time t.
 const STYLE = Number(new URLSearchParams(location.search).get('style') || 1);
-const W = 1920, H = 1080, DURATION = STYLE === 4 ? 18.0 : 6.0;
+const W = 1920, H = 1080, DURATION = STYLE === 4 ? 50.0 : 6.0;
 const NAVY = '#183d6e', DEEP = '#050d1f', ORANGE = '#f47b20', RED = '#d6312b', CYAN = '#5fd2ff';
 const ctx = document.getElementById('c').getContext('2d');
 const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -374,15 +374,16 @@ function drawHMI(c, mode, t, power) {
   c.fillStyle = gl; c.fillRect(50, 46, 900, 600);
 }
 
+// Timings follow the ElevenLabs read (assets/audio/vo-rev1.mp3), split and placed by src/mix_rev1.sh:
+// hook 0.8s · VFD 7.3s · PLC 16.3s · HMI 24.7s · warranty 32.2s · close 41.7s.
 const PRODUCTS = [
-  { t0: 0.8, img: 'drive', title: 'VARIABLE', sub: 'FREQUENCY DRIVES', brands: 'ABB · ALLEN BRADLEY · SIEMENS · YASKAWA · +MORE' },
-  { t0: 5.2, draw: drawPLC, title: 'PLC', sub: 'PROGRAMMABLE CONTROLLERS', brands: 'SIEMENS · ALLEN BRADLEY · MODICON · OMRON · +MORE' },
-  { t0: 9.6, draw: drawHMI, title: 'HMI', sub: 'OPERATOR INTERFACES', brands: 'ALLEN BRADLEY · PANELMATE · XYCOM · FANUC · +MORE' },
+  { t0: 6.3, seg: 9.0, img: 'drive', title: 'VARIABLE', sub: 'FREQUENCY DRIVES', brands: 'ABB · ALLEN BRADLEY · SIEMENS · YASKAWA · +MORE' },
+  { t0: 15.3, seg: 8.4, draw: drawPLC, title: 'PLC', sub: 'PROGRAMMABLE CONTROLLERS', brands: 'SIEMENS · ALLEN BRADLEY · MODICON · OMRON · +MORE' },
+  { t0: 23.7, seg: 8.0, draw: drawHMI, title: 'HMI', sub: 'OPERATOR INTERFACES', brands: 'ALLEN BRADLEY · PANELMATE · XYCOM · FANUC · +MORE' },
 ];
-const SEG = 4.4;   // seconds per product
 let offCv;
 function productSeg(p, t) {
-  const lt = t - p.t0; if (lt < 0 || lt > SEG + 0.2) return;
+  const lt = t - p.t0, SEG = p.seg; if (lt < 0 || lt > SEG + 0.2) return;
   const out = eIn(P(lt, SEG - 0.55, 0.55));                                         // exit: slide left + fade
   const cx = 1400 - out * 260, cy = 540, boxW = 700, boxH = 680;
   let w, h;
@@ -390,6 +391,8 @@ function productSeg(p, t) {
   const x = cx - w / 2, y = cy - h / 2 + (1 - eOut(P(lt, 0, 0.6))) * 60;
   const k = P(lt, 0, 2.2), scanY = y + h * eOut(cl(k / 0.55));
   ctx.save(); ctx.globalAlpha = 1 - out;
+  const push = 1 + 0.06 * eIO(P(lt, 1.0, SEG - 1.0));                             // slow push-in while it holds
+  ctx.translate(W * 0.55, cy); ctx.scale(push, push); ctx.translate(-W * 0.55, -cy);
   // blueprint pass, revealed by the scan line
   ctx.save(); ctx.beginPath(); ctx.rect(x - 40, y - 40, w + 80, scanY - y + 40); ctx.clip();
   ctx.globalAlpha *= 1 - P(lt, 1.8, 0.6) * 0.8; ctx.globalCompositeOperation = 'lighter'; ctx.shadowColor = CYAN; ctx.shadowBlur = 14;
@@ -423,16 +426,18 @@ function productSeg(p, t) {
 
 const SERVICES = ['EVALUATED REPAIRS', 'SYSTEM / LOAD TESTING', '18-MONTH IN-SERVICE WARRANTY', '1-YEAR SHELF LIFE'];
 function warrantyEnd(t) {
-  const t0 = 13.8; if (t < t0) return;
-  const lt = t - t0;
+  const t0 = 31.4, END = 41.0; if (t < t0) return;
+  const lt = t - t0, gone = P(t, END, 0.6);
+  const CHECK = [0.8, 2.55, 4.3, 6.8];   // "evaluated", "load tested", "18-month", "shelf life"
   ctx.fillStyle = `rgba(2,8,20,${0.6 * eOut(P(lt, 0, 0.5))})`; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.globalAlpha = 1 - gone;
   text('EVERY REPAIR INCLUDES', W / 2, 190, { size: 26, weight: 800, ls: 8, color: ORANGE, alpha: P(lt, 0.1, 0.4) });
   SERVICES.forEach((s, i) => {
-    const k = P(lt, 0.35 + i * 0.4, 0.35), y = 285 + i * 105, x0 = 560;
+    const k = P(lt, CHECK[i] - 0.35, 0.35), y = 285 + i * 105, x0 = 560;
     if (k <= 0) return;
-    ctx.save(); ctx.globalAlpha = k; ctx.translate((1 - eOut(k)) * -60, 0);
+    ctx.save(); ctx.globalAlpha *= k; ctx.translate((1 - eOut(k)) * -60, 0);
     ctx.strokeStyle = ORANGE; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(x0 - 40, y - 34, 68, 68, 12); ctx.stroke();
-    const ck = P(lt, 0.5 + i * 0.4, 0.25);                                          // check mark draws on
+    const ck = P(lt, CHECK[i], 0.25);                                          // check mark draws on
     if (ck > 0) {
       ctx.strokeStyle = '#3cff6b'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.shadowColor = '#3cff6b'; ctx.shadowBlur = 16; ctx.beginPath();
       const pts = [[x0 - 22, y + 2], [x0 - 6, y + 18], [x0 + 22, y - 18]], seg = ck * 2, j = Math.min(1, Math.floor(seg));
@@ -444,7 +449,7 @@ function warrantyEnd(t) {
     text(s, x0 + 70, y, { size: 56, italic: true, align: 'left', alpha: k });
   });
   // bumper-to-bumper LED badge
-  const wk = P(lt, 2.2, 0.45);
+  const wk = P(lt, 8.3, 0.45);   // "bumper to bumper"
   if (wk > 0) {
     const bx = W / 2, by = 735, s = eBack(wk);
     ctx.save(); ctx.translate(bx, by); ctx.scale(s, s);
@@ -454,14 +459,22 @@ function warrantyEnd(t) {
     text('BUMPER-TO-BUMPER WARRANTY', -6, 2, { size: 44, italic: true });
     ctx.restore();
   }
-  text('704-702-6380  ·  QUALITROL.COM', W / 2, 900, { size: 40, weight: 800, ls: 3, alpha: P(lt, 2.8, 0.5) });
+  ctx.restore();
+  // end card: logo moves to centre, contact line underneath
+  const ek = eIO(P(t, END + 0.3, 1.0));
+  if (ek > 0) logo(lerp(230, W / 2, ek), lerp(90, 450, ek), lerp(340, 1100, ek));
+  text('704-702-6380  ·  QUALITROL.COM', W / 2, 760, { size: 54, weight: 800, ls: 4, alpha: P(t, END + 1.2, 0.6) });
+  text('REPAIRED · TESTED · WARRANTIED', W / 2, 850, { size: 26, weight: 800, ls: 8, color: ORANGE, alpha: P(t, END + 1.8, 0.6) });
 }
 
 function styleLineup(t) {
-  circuitBG(t, 4.2);
+  circuitBG(t, 2.0);
+  // hook: big logo centre-stage, then it tucks into the corner before the VFD arrives
+  const hk = eIO(P(t, 5.2, 0.9));
+  if (t < 31.4 + 9.6) logo(lerp(W / 2, 230, hk), lerp(470, 90, hk), lerp(1000, 340, hk), P(t, 0.6, 0.8));
+  text('INDUSTRIAL ELECTRONIC REPAIR', W / 2, 700, { size: 34, weight: 800, ls: 10, color: ORANGE, alpha: P(t, 1.6, 0.6) * (1 - P(t, 4.9, 0.4)) });
   for (const p of PRODUCTS) productSeg(p, t);
   warrantyEnd(t);
-  logo(230, 90, 340, P(t, 0.3, 0.6));
 }
 
 function render(t) {

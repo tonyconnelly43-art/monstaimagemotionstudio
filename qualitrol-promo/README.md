@@ -12,20 +12,27 @@ Logo and product photos are cut from the supplied brochure (`assets/brochure.pdf
 STYLE=1 node src/render.mjs build/test1.mp4 30    # 2, 3 likewise
 ```
 
-## Client revision 1: VFD → PLC → HMI (18s, 30fps, silent)
+## Client revision 1: VFD → PLC → HMI with voiceover (50s, 30fps, -16 LUFS)
 
 Client feedback on test 2: loves the VFD opening; wants PLC second and HMI last, and to finish on
 "Evaluated repairs, system/load testing, 18-month in-service warranty w/ 1-year shelf life (bumper to bumper) warranty".
-This replaces the placeholder "2-Year Warranty" badge.
+Must be under a minute. The first cut (18s) was too fast, so this version is paced to an ElevenLabs read.
 
 `qualitrol-rev1-vfd-plc-hmi.mp4` (`STYLE=4`):
 
-| Time | Beat |
-|---|---|
-| 0–5.2s | Circuit flythrough; VFD scans in as a cyan blueprint, wipes into the photo, label + brands |
-| 5.2–9.6s | PLC, same build; I/O LEDs start blinking and the CPU switches to RUN once it powers up |
-| 9.6–14s | HMI, same build; screen flashes on into a live process screen (tank level, speed trend, RPM/amps) |
-| 13.8–18s | "Every repair includes": four lines check off, "Bumper-to-Bumper Warranty" badge, 704-702-6380 · qualitrol.com |
+| Time | Picture | Voiceover |
+|---|---|---|
+| 0–6s | Circuit flythrough, big logo + "Industrial Electronic Repair", logo tucks into the corner | "When your line goes down, every minute costs you. Qualitrol International gets you running again." |
+| 6.3–15.3s | VFD scans in as a blueprint, fills in as the photo, label + brands, slow push-in | "Variable frequency drives. ABB, Allen Bradley, Siemens, Yaskawa, and dozens more, repaired and tested." |
+| 15.3–23.7s | PLC, same build; CPU switches to RUN, I/O LEDs blink | "PLCs from every major manufacturer: evaluated, repaired, and proven before they ship." |
+| 23.7–31.7s | HMI, same build; screen powers on into a live process screen | "Operator interfaces and HMIs, brought back to life and ready to install." |
+| 31.4–41s | "Every repair includes": each line checks off on its word, then the Bumper-to-Bumper badge | "Every repair is evaluated... system and load tested... backed by an eighteen-month in-service warranty... with a one-year shelf life. Bumper to bumper." |
+| 41–50s | Logo moves to centre, 704-702-6380 · qualitrol.com, "Repaired · Tested · Warrantied" | "Qualitrol International. Call 704-702-6380, or visit qualitrol.com." |
+
+Audio: `assets/audio/vo-rev1.mp3` is the client-approved script read in one take; `src/mix_rev1.sh` cuts it at its
+natural pauses and places each line (table at the top of the script). Music bed and SFX are synthesized by
+`src/sfx_rev1.py` (100 BPM, Am–F–G–Em pad, kick from the VFD on, ticks on each checkmark, hits on the badge and end card).
+The bed ducks under the voice.
 
 **PLC and HMI are drawn stand-ins** (`drawPLC`, `drawHMI` in `src/tests.html`), modelled on the units in the client's
 reference videos (a Siemens S7-300-style rack PLC and a Moeller/Micro Innovation-style operator panel), with no
@@ -33,5 +40,7 @@ manufacturer logos. Swap in photos when the client sends them: cut the product o
 `drive-edges.png`, and give that product `img:` instead of `draw:` in `PRODUCTS`.
 
 ```
-STYLE=4 node src/render.mjs build/rev1.mp4 30
+STYLE=4 node src/render.mjs build/rev1_video.mp4 30
+python3 src/sfx_rev1.py
+./src/mix_rev1.sh
 ```
