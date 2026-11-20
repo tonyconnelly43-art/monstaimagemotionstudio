@@ -17,13 +17,14 @@
 // 1 = Global Signal (dotted globe), 2 = Inside the Machine (circuit flythrough),
 // 3 = Fault to Fixed (diagnostic HUD). render(t) draws time t.
 const STYLE = Number(new URLSearchParams(location.search).get('style') || 1);
-const W = 1920, H = 1080, DURATION = 6.0;
+const W = 1920, H = 1080, DURATION = STYLE === 4 ? 18.0 : 6.0;
 const NAVY = '#183d6e', DEEP = '#050d1f', ORANGE = '#f47b20', RED = '#d6312b', CYAN = '#5fd2ff';
 const ctx = document.getElementById('c').getContext('2d');
 const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const P = (t, s, d) => cl((t - s) / d);
 const lerp = (a, b, x) => a + (b - a) * x;
 const eOut = x => 1 - Math.pow(1 - x, 3);
+const eIn = x => x * x * x;
 const eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -131,9 +132,9 @@ const TRACES = (() => {           // board-space traces: x in [-12,12], z in [0,
   return T;
 })();
 const CHIPS = (() => { const r = rng(21); return Array.from({ length: 60 }, () => ({ x: (r() - 0.5) * 26, z: r() * 120, w: 1 + r() * 2.5, d: 1 + r() * 3 })); })();
-function styleCircuit(t) {
+function circuitBG(t, speed = 6) {
   ctx.fillStyle = '#020814'; ctx.fillRect(0, 0, W, H);
-  const camZ = t * 6, horizon = 300;
+  const camZ = t * speed, horizon = 300;
   const proj = (x, z) => { const dz = z - camZ; if (dz < 0.5) return null; return [W / 2 + x * 170 / dz, horizon + 760 / dz]; };
   // board glow
   const g = ctx.createLinearGradient(0, horizon, 0, H); g.addColorStop(0, 'rgba(10,40,80,0)'); g.addColorStop(1, 'rgba(18,61,110,0.55)'); ctx.fillStyle = g; ctx.fillRect(0, horizon, W, H - horizon);
@@ -165,6 +166,9 @@ function styleCircuit(t) {
   fog.addColorStop(0, 'rgba(2,8,20,1)'); fog.addColorStop(0.45, 'rgba(2,8,20,0.85)'); fog.addColorStop(1, 'rgba(2,8,20,0)');
   ctx.fillStyle = fog; ctx.fillRect(0, 0, W, horizon + 330);
   vignette(0.5);
+}
+function styleCircuit(t) {
+  circuitBG(t);
   // product assembles: blueprint -> photo
   const k = P(t, 1.6, 2.4);
   if (k > 0) {
@@ -266,12 +270,206 @@ function styleHUD(t) {
   vignette(0.55);
 }
 
+// =================== 4. INSIDE THE MACHINE: VFD -> PLC -> HMI + warranty (client revision 1) ===================
+// PLC and HMI are drawn stand-ins (modelled on the units in the client's reference videos) until real photos arrive.
+// Each drawn product is one geometry function run in two modes: 'line' = cyan blueprint, 'fill' = finished unit.
+function shapeKit(c, mode) {
+  return {
+    rect(x, y, w, h, fill, r = 0, stroke) {
+      c.beginPath(); r ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h);
+      if (mode === 'line') { c.strokeStyle = CYAN; c.lineWidth = 2.2; c.stroke(); return; }
+      if (fill) { c.fillStyle = fill; c.fill(); }
+      if (stroke) { c.strokeStyle = stroke; c.lineWidth = 2; c.stroke(); }
+    },
+    dot(x, y, r, fill, glow) {
+      c.beginPath(); c.arc(x, y, r, 0, 7);
+      if (mode === 'line') { c.strokeStyle = CYAN; c.lineWidth = 1.6; c.stroke(); return; }
+      c.save(); if (glow) { c.shadowColor = fill; c.shadowBlur = glow; } c.fillStyle = fill; c.fill(); c.restore();
+    },
+    line(x1, y1, x2, y2, col = 'rgba(0,0,0,0.5)', lw = 2) {
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.strokeStyle = mode === 'line' ? 'rgba(95,210,255,0.6)' : col; c.lineWidth = mode === 'line' ? 1.4 : lw; c.stroke();
+    },
+    txt(str, x, y, size, col = '#cfd6da', weight = 700, align = 'left') {
+      if (mode === 'line') return;
+      c.font = `${weight} ${size}px Montserrat`; c.fillStyle = col; c.textAlign = align; c.textBaseline = 'middle'; c.letterSpacing = '0px'; c.fillText(str, x, y);
+    },
+    grad(x0, y0, x1, y1, stops) { const g = c.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; },
+  };
+}
+// Modular rack PLC (dark grey modules on a DIN rail, green I/O label strips). Unit space 1000 x 760.
+function drawPLC(c, mode, t, power) {
+  const k = shapeKit(c, mode);
+  k.rect(-40, 300, 1080, 120, k.grad(0, 300, 0, 420, [[0, '#d9dde0'], [0.5, '#9aa2a8'], [1, '#c9ced2']]), 4);   // DIN rail
+  for (let x = -20; x < 1040; x += 70) k.rect(x, 345, 40, 30, 'rgba(60,66,72,0.6)', 6);
+  const mods = [{ x: 0, w: 170, kind: 'ps' }, { x: 176, w: 250, kind: 'cpu' }, { x: 432, w: 180, kind: 'io', n: 'DI 32' }, { x: 618, w: 180, kind: 'io', n: 'DO 32' }, { x: 804, w: 180, kind: 'io', n: 'AI 8' }];
+  for (const m of mods) {
+    const body = k.grad(m.x, 0, m.x + m.w, 0, [[0, '#2c3033'], [0.15, '#464b4f'], [0.85, '#3d4245'], [1, '#26292c']]);
+    k.rect(m.x, 0, m.w, 760, body, 6, 'rgba(0,0,0,0.6)');
+    k.rect(m.x + 8, 8, m.w - 16, 22, 'rgba(255,255,255,0.06)', 4);                  // top lip
+    k.line(m.x + 6, 380, m.x + m.w - 6, 380, 'rgba(0,0,0,0.55)', 3);                 // front door split
+    k.rect(m.x + 14, 720, m.w - 28, 22, 'rgba(0,0,0,0.25)', 3);                       // vent
+    if (m.kind === 'ps') {
+      k.txt('PS 24V', m.x + 20, 70, 22); k.txt('5A', m.x + 20, 100, 18, '#9aa4aa');
+      k.dot(m.x + 130, 70, 9, power > 0 ? '#3cff6b' : '#173b22', power > 0 ? 14 : 0);
+      k.rect(m.x + 40, 470, 90, 54, '#1b1e20', 6); k.rect(m.x + 52, 480, 30, 34, power > 0 ? '#e9ecee' : '#6b7277', 3);
+    }
+    if (m.kind === 'cpu') {
+      k.txt('CPU', m.x + 20, 60, 26); k.txt('PN/DP', m.x + 20, 92, 18, '#9aa4aa');
+      const leds = [['SF', '#ff3b30', 0], ['BF', '#ff3b30', 0], ['DC5V', '#3cff6b', 1], ['FRCE', '#ffb020', 0], ['RUN', '#3cff6b', 2], ['STOP', '#ffb020', 3]];
+      leds.forEach(([n, col, on], i) => {
+        const lit = power > 0 && (on === 1 || (on === 2 && power > 0.5) || (on === 3 && power <= 0.5));
+        k.dot(m.x + 34, 140 + i * 34, 8, lit ? col : '#2a2f31', lit ? 14 : 0); k.txt(n, m.x + 54, 140 + i * 34, 16, '#aab3b8');
+      });
+      k.rect(m.x + 150, 140, 70, 120, '#1b1e20', 6); k.rect(m.x + 166, power > 0.5 ? 150 : 210, 38, 40, '#8c959b', 4);   // RUN/STOP switch
+      k.rect(m.x + 30, 420, m.w - 60, 30, '#15181a', 4);                              // memory card slot
+      k.rect(m.x + 30, 600, 80, 60, '#15181a', 4); k.rect(m.x + 130, 600, 80, 60, '#15181a', 4);  // ports
+    }
+    if (m.kind === 'io') {
+      k.txt(m.n, m.x + 18, 58, 20);
+      k.rect(m.x + 70, 90, m.w - 88, 600, k.grad(m.x, 0, m.x + m.w, 0, [[0, '#6fc2a9'], [1, '#9fdcc8']]), 3);   // green label strip
+      for (let i = 1; i < 16; i++) k.line(m.x + 70, 90 + i * 37.5, m.x + m.w - 18, 90 + i * 37.5, 'rgba(20,70,55,0.45)', 1.5);
+      for (let i = 0; i < 16; i++) {
+        const lit = power > 0.5 && Math.sin(t * (3 + i * 0.7) + m.x * 0.01 + i * 1.9) > 0.1;
+        k.dot(m.x + 38, 108 + i * 37.5, 6.5, lit ? '#3cff6b' : '#22272a', lit ? 10 : 0);
+      }
+    }
+  }
+}
+// Operator panel HMI (light grey bezel, touchscreen running a process screen). Unit space 1000 x 760.
+function drawHMI(c, mode, t, power) {
+  const k = shapeKit(c, mode);
+  k.rect(0, 0, 1000, 760, k.grad(0, 0, 0, 760, [[0, '#e2e5e8'], [1, '#b5bbc0']]), 28, 'rgba(0,0,0,0.35)');
+  k.rect(18, 18, 964, 724, 'rgba(255,255,255,0.15)', 20);
+  k.rect(50, 46, 900, 600, '#0c0f12', 10);                                          // glass
+  k.dot(110, 700, 9, power > 0 ? '#3cff6b' : '#3a3f43', power > 0 ? 14 : 0); k.txt('POWER', 130, 700, 18, '#5c6469');
+  for (let i = 0; i < 5; i++) k.rect(330 + i * 100, 680, 76, 40, '#c7ccd0', 8, 'rgba(0,0,0,0.25)');   // F-keys
+  if (mode === 'line') {                                                            // blueprint of the UI layout
+    k.rect(70, 66, 860, 50); k.rect(80, 140, 330, 360, 0, 6); k.rect(440, 140, 470, 230, 0, 6); k.rect(440, 390, 220, 110, 0, 6); k.rect(690, 390, 220, 110, 0, 6); k.rect(80, 530, 400, 90, 0, 8); k.rect(520, 530, 400, 90, 0, 8);
+    return;
+  }
+  if (power <= 0) return;
+  const on = cl(power * 3);
+  c.save(); c.beginPath(); c.roundRect(50, 46, 900, 600, 10); c.clip(); c.globalAlpha = on;
+  c.fillStyle = '#0b1e36'; c.fillRect(50, 46, 900, 600);
+  c.fillStyle = NAVY; c.fillRect(50, 46, 900, 70);
+  k.txt('LINE 2 · DRIVE CONTROL', 80, 82, 28, '#fff', 800); k.txt('● ONLINE', 920, 82, 24, '#3cff6b', 800, 'right');
+  // tank with animated level
+  k.rect(80, 140, 330, 360, '#10294a', 8, 'rgba(95,210,255,0.4)');
+  const lvl = 0.55 + 0.12 * Math.sin(t * 1.3);
+  c.fillStyle = 'rgba(95,210,255,0.55)'; c.fillRect(150, 160 + 300 * (1 - lvl), 190, 300 * lvl);
+  c.strokeStyle = '#cfe6ff'; c.lineWidth = 3; c.strokeRect(150, 160, 190, 300);
+  k.txt(`${Math.round(lvl * 100)}%`, 245, 480, 26, '#fff', 800, 'center');
+  // trend chart
+  k.rect(440, 140, 470, 230, '#10294a', 8, 'rgba(95,210,255,0.4)'); k.txt('MOTOR SPEED', 460, 166, 18, '#8fb4d9', 800);
+  c.beginPath(); for (let i = 0; i <= 60; i++) { const x = 460 + i * 7.3, y = 300 - 60 * Math.sin(i * 0.25 + t * 3) * Math.cos(i * 0.07 - t); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+  c.strokeStyle = ORANGE; c.lineWidth = 4; c.stroke();
+  // readouts
+  k.rect(440, 390, 220, 110, '#10294a', 8, 'rgba(95,210,255,0.4)'); k.txt('RPM', 460, 414, 16, '#8fb4d9', 800); k.txt(String(1745 + Math.round(8 * Math.sin(t * 5))), 460, 465, 46, '#fff', 900);
+  k.rect(690, 390, 220, 110, '#10294a', 8, 'rgba(95,210,255,0.4)'); k.txt('AMPS', 710, 414, 16, '#8fb4d9', 800); k.txt((12.4 + 0.3 * Math.sin(t * 4)).toFixed(1), 710, 465, 46, '#fff', 900);
+  k.rect(80, 530, 400, 90, '#1f9d55', 12); k.txt('START', 280, 575, 34, '#fff', 900, 'center');
+  k.rect(520, 530, 400, 90, '#c62f2a', 12); k.txt('STOP', 720, 575, 34, '#fff', 900, 'center');
+  c.restore();
+  if (power < 0.25) { c.save(); c.globalAlpha = 1 - power * 4; c.fillStyle = '#fff'; c.fillRect(50, 46, 900, 600); c.restore(); }   // power-on flash
+  const gl = c.createLinearGradient(50, 46, 950, 646); gl.addColorStop(0, 'rgba(255,255,255,0.10)'); gl.addColorStop(0.4, 'rgba(255,255,255,0)');   // glass sheen
+  c.fillStyle = gl; c.fillRect(50, 46, 900, 600);
+}
+
+const PRODUCTS = [
+  { t0: 0.8, img: 'drive', title: 'VARIABLE', sub: 'FREQUENCY DRIVES', brands: 'ABB · ALLEN BRADLEY · SIEMENS · YASKAWA · +MORE' },
+  { t0: 5.2, draw: drawPLC, title: 'PLC', sub: 'PROGRAMMABLE CONTROLLERS', brands: 'SIEMENS · ALLEN BRADLEY · MODICON · OMRON · +MORE' },
+  { t0: 9.6, draw: drawHMI, title: 'HMI', sub: 'OPERATOR INTERFACES', brands: 'ALLEN BRADLEY · PANELMATE · XYCOM · FANUC · +MORE' },
+];
+const SEG = 4.4;   // seconds per product
+let offCv;
+function productSeg(p, t) {
+  const lt = t - p.t0; if (lt < 0 || lt > SEG + 0.2) return;
+  const out = eIn(P(lt, SEG - 0.55, 0.55));                                         // exit: slide left + fade
+  const cx = 1400 - out * 260, cy = 540, boxW = 700, boxH = 680;
+  let w, h;
+  if (p.img) { h = boxH; w = h * IMG[p.img].width / IMG[p.img].height; } else { w = boxW; h = w * 760 / 1000; }
+  const x = cx - w / 2, y = cy - h / 2 + (1 - eOut(P(lt, 0, 0.6))) * 60;
+  const k = P(lt, 0, 2.2), scanY = y + h * eOut(cl(k / 0.55));
+  ctx.save(); ctx.globalAlpha = 1 - out;
+  // blueprint pass, revealed by the scan line
+  ctx.save(); ctx.beginPath(); ctx.rect(x - 40, y - 40, w + 80, scanY - y + 40); ctx.clip();
+  ctx.globalAlpha *= 1 - P(lt, 1.8, 0.6) * 0.8; ctx.globalCompositeOperation = 'lighter'; ctx.shadowColor = CYAN; ctx.shadowBlur = 14;
+  if (p.img) { for (let i = 0; i < 3; i++) ctx.drawImage(IMG[p.img + '-edges'], x, y, w, h); }
+  else { ctx.translate(x, y); ctx.scale(w / 1000, h / 760); p.draw(ctx, 'line', t, 0); }
+  ctx.restore();
+  if (k > 0 && k < 0.6) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(95,210,255,0.9)'; ctx.shadowColor = CYAN; ctx.shadowBlur = 25; ctx.fillRect(x - 40, scanY - 2, w + 80, 4); ctx.restore(); }
+  // finished unit wipes in bottom-up
+  const fill = P(lt, 1.1, 0.8);
+  if (fill > 0) {
+    const fy = y + h * (1 - eOut(fill));
+    ctx.save(); ctx.beginPath(); ctx.rect(x - 50, fy, w + 100, h - (fy - y) + 50); ctx.clip();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 20;
+    if (p.img) ctx.drawImage(IMG[p.img], x, y, w, h);
+    else { ctx.translate(x, y); ctx.scale(w / 1000, h / 760); ctx.shadowColor = 'transparent'; p.draw(ctx, 'fill', t, P(lt, 2.0, 1.2)); }
+    ctx.restore();
+  }
+  shineSweep(x, y, w, h, P(lt, 2.0, 0.9));
+  // callout + label
+  const lk = P(lt, 1.6, 0.5), lx = x - 40, ty = cy - 80;
+  if (lk > 0) {
+    ctx.strokeStyle = ORANGE; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(lx, ty + 30); ctx.lineTo(lx - 200 * eOut(lk), ty + 30); ctx.stroke();
+    ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(lx, ty + 30, 7, 0, 7); ctx.fill();
+    const tx = lx - 230;
+    text(p.title, tx, ty, { size: p.title.length > 4 ? 76 : 110, italic: true, alpha: lk, align: 'right' });
+    text(p.sub, tx, ty + 85, { size: p.sub.length > 20 ? 36 : 46, italic: true, color: ORANGE, alpha: lk, align: 'right' });
+    text(p.brands, tx, ty + 145, { size: 21, weight: 700, ls: 2, alpha: P(lt, 1.9, 0.5) * 0.85, align: 'right', color: '#bcd6f5' });
+  }
+  ctx.restore();
+}
+
+const SERVICES = ['EVALUATED REPAIRS', 'SYSTEM / LOAD TESTING', '18-MONTH IN-SERVICE WARRANTY', '1-YEAR SHELF LIFE'];
+function warrantyEnd(t) {
+  const t0 = 13.8; if (t < t0) return;
+  const lt = t - t0;
+  ctx.fillStyle = `rgba(2,8,20,${0.6 * eOut(P(lt, 0, 0.5))})`; ctx.fillRect(0, 0, W, H);
+  text('EVERY REPAIR INCLUDES', W / 2, 190, { size: 26, weight: 800, ls: 8, color: ORANGE, alpha: P(lt, 0.1, 0.4) });
+  SERVICES.forEach((s, i) => {
+    const k = P(lt, 0.35 + i * 0.4, 0.35), y = 285 + i * 105, x0 = 560;
+    if (k <= 0) return;
+    ctx.save(); ctx.globalAlpha = k; ctx.translate((1 - eOut(k)) * -60, 0);
+    ctx.strokeStyle = ORANGE; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(x0 - 40, y - 34, 68, 68, 12); ctx.stroke();
+    const ck = P(lt, 0.5 + i * 0.4, 0.25);                                          // check mark draws on
+    if (ck > 0) {
+      ctx.strokeStyle = '#3cff6b'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.shadowColor = '#3cff6b'; ctx.shadowBlur = 16; ctx.beginPath();
+      const pts = [[x0 - 22, y + 2], [x0 - 6, y + 18], [x0 + 22, y - 18]], seg = ck * 2, j = Math.min(1, Math.floor(seg));
+      ctx.moveTo(...pts[0]); if (seg < 1) ctx.lineTo(lerp(pts[0][0], pts[1][0], seg), lerp(pts[0][1], pts[1][1], seg));
+      else { ctx.lineTo(...pts[1]); ctx.lineTo(lerp(pts[1][0], pts[2][0], seg - 1), lerp(pts[1][1], pts[2][1], seg - 1)); }
+      ctx.stroke();
+    }
+    ctx.restore();
+    text(s, x0 + 70, y, { size: 56, italic: true, align: 'left', alpha: k });
+  });
+  // bumper-to-bumper LED badge
+  const wk = P(lt, 2.2, 0.45);
+  if (wk > 0) {
+    const bx = W / 2, by = 735, s = eBack(wk);
+    ctx.save(); ctx.translate(bx, by); ctx.scale(s, s);
+    ctx.shadowColor = ORANGE; ctx.shadowBlur = 40 + 20 * Math.sin(t * 8);
+    ctx.fillStyle = '#0b1c36'; ctx.strokeStyle = ORANGE; ctx.lineWidth = 5; ctx.beginPath(); ctx.roundRect(-520, -55, 1040, 110, 55); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(-462, 0, 14, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(462, 0, 14, 0, 7); ctx.fill();
+    text('BUMPER-TO-BUMPER WARRANTY', -6, 2, { size: 44, italic: true });
+    ctx.restore();
+  }
+  text('704-702-6380  ·  QUALITROL.COM', W / 2, 900, { size: 40, weight: 800, ls: 3, alpha: P(lt, 2.8, 0.5) });
+}
+
+function styleLineup(t) {
+  circuitBG(t, 4.2);
+  for (const p of PRODUCTS) productSeg(p, t);
+  warrantyEnd(t);
+  logo(230, 90, 340, P(t, 0.3, 0.6));
+}
+
 function render(t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.letterSpacing = '0px';
-  [null, styleGlobe, styleCircuit, styleHUD][STYLE](t);
+  [null, styleGlobe, styleCircuit, styleHUD, styleLineup][STYLE](t);
   // label
-  ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(W - 470, H - 82, 430, 52, 10); ctx.fill();
-  text(`STYLE TEST ${STYLE} · ${['', 'GLOBAL SIGNAL', 'INSIDE THE MACHINE', 'FAULT TO FIXED'][STYLE]}`, W - 255, H - 55, { size: 20, weight: 800, ls: 2 }); ctx.restore();
+  if (STYLE !== 4) { ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(W - 470, H - 82, 430, 52, 10); ctx.fill();
+  text(`STYLE TEST ${STYLE} · ${['', 'GLOBAL SIGNAL', 'INSIDE THE MACHINE', 'FAULT TO FIXED'][STYLE]}`, W - 255, H - 55, { size: 20, weight: 800, ls: 2 }); ctx.restore(); }
   const fi = 1 - P(t, 0, 0.3); if (fi > 0) { ctx.fillStyle = `rgba(0,0,0,${fi})`; ctx.fillRect(0, 0, W, H); }
   const fo = P(t, DURATION - 0.3, 0.3); if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${fo})`; ctx.fillRect(0, 0, W, H); }
 }
