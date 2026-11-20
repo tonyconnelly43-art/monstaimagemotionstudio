@@ -62,11 +62,13 @@ function slerpLL(a, b, f) {
   const p = [0, 1, 2].map(i => (Math.sin((1 - f) * d) * A[i] + Math.sin(f * d) * B[i]) / s);
   return [Math.asin(p[2]), Math.atan2(p[1], p[0])];
 }
-function styleGlobe(t) {
+function globeBG(t) {
   ctx.fillStyle = DEEP; ctx.fillRect(0, 0, W, H);
   const bg = ctx.createRadialGradient(W * 0.62, H * 0.55, 50, W * 0.62, H * 0.55, 1100);
   bg.addColorStop(0, '#12325f'); bg.addColorStop(1, 'rgba(5,13,31,0)'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
   const r0 = rng(3); for (let i = 0; i < 160; i++) { const x = r0() * W, y = r0() * H; ctx.fillStyle = `rgba(160,200,255,${0.15 + 0.35 * r0() * (0.6 + 0.4 * Math.sin(t * 2 + i))})`; ctx.fillRect(x, y, 2, 2); }
+}
+function globeBody(t) {
   const push = eOut(P(t, 0, 6));
   const R = lerp(560, 640, push), cx = W * 0.72, cy = H * 0.58 + lerp(80, 0, eOut(P(t, 0, 1.5)));
   const rot = 1.15 + t * 0.12, tilt = 0.38;
@@ -105,6 +107,9 @@ function styleGlobe(t) {
     }
     ctx.restore();
   }
+}
+function styleGlobe(t) {
+  globeBG(t); globeBody(t);
   const lg = ctx.createLinearGradient(0, 0, W * 0.55, 0); lg.addColorStop(0, 'rgba(3,9,22,0.85)'); lg.addColorStop(1, 'rgba(3,9,22,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
   vignette(0.55);
   // logo + line
@@ -468,11 +473,32 @@ function warrantyEnd(t) {
 }
 
 function styleLineup(t) {
-  circuitBG(t, 2.0);
-  // hook: big logo centre-stage, then it tucks into the corner before the VFD arrives
-  const hk = eIO(P(t, 5.2, 0.9));
-  if (t < 31.4 + 9.6) logo(lerp(W / 2, 230, hk), lerp(470, 90, hk), lerp(1000, 340, hk), P(t, 0.6, 0.8));
-  text('INDUSTRIAL ELECTRONIC REPAIR', W / 2, 700, { size: 34, weight: 800, ls: 10, color: ORANGE, alpha: P(t, 1.6, 0.6) * (1 - P(t, 4.9, 0.4)) });
+  // opening: the Global Signal globe, which sinks away into the circuit board as the VFD section starts
+  const gk = eIO(P(t, 5.6, 2.2));
+  if (gk > 0) circuitBG(t, 2.0);
+  if (gk < 1) {
+    ctx.save(); ctx.globalAlpha = 1 - gk; globeBG(t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 1 - eIn(P(t, 5.6, 2.2));
+    const gx = W * 0.72, gy = H * 0.58, gs = lerp(1, 0.55, gk);
+    ctx.translate(gx + 120 * gk, gy + 520 * gk); ctx.scale(gs, gs); ctx.translate(-gx, -gy);
+    globeBody(t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 1 - gk;
+    const lg = ctx.createLinearGradient(0, 0, W * 0.55, 0); lg.addColorStop(0, 'rgba(3,9,22,0.85)'); lg.addColorStop(1, 'rgba(3,9,22,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+    vignette(0.55); ctx.restore();
+  }
+  // hook: logo on the left beside the globe (as in the original test), then it tucks into the corner
+  const lk = P(t, 1.0, 0.6), hk = eIO(P(t, 5.2, 0.9));
+  if (lk > 0 && t < 41.0) {
+    const s0 = lerp(1.35, 1, eOut(lk)) * lerp(1, 340 / 720, hk);
+    ctx.save(); ctx.translate(lerp(520, 230, hk), lerp(470, 90, hk)); ctx.scale(s0, s0);
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 30 * (1 - hk); logo(0, 0, 720, cl(lk * 3)); ctx.restore();
+    if (hk === 0) shineSweep(520 - 360, 350, 720, 240, P(t, 1.6, 0.9));
+  }
+  const tk = P(t, 2.3, 0.5), tout = 1 - P(t, 4.9, 0.4);
+  if (tk > 0 && tout > 0) {
+    ctx.save(); ctx.globalAlpha = tout; ctx.fillStyle = ORANGE; ctx.fillRect(520 - 380, 600, 760 * eOut(tk), 4); ctx.restore();
+    text('INDUSTRIAL ELECTRONIC REPAIR', 520, 645, { size: 32, weight: 700, ls: 6, alpha: cl(tk * 2) * tout });
+  }
   for (const p of PRODUCTS) productSeg(p, t);
   warrantyEnd(t);
 }

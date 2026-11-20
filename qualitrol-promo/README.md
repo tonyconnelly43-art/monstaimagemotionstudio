@@ -44,3 +44,15 @@ STYLE=4 node src/render.mjs build/rev1_video.mp4 30
 python3 src/sfx_rev1.py
 ./src/mix_rev1.sh
 ```
+
+## Revision 2: globe opening (50s)
+
+`qualitrol-rev2-globe-open.mp4`: same as revision 1, but the opening uses the Global Signal globe from style test 1
+(dotted Earth, arcs out of Charlotte, orbit rings) with the logo and "Industrial Electronic Repair" on the left.
+From 5.6s the globe sinks and fades while the circuit board fades in, gone by ~7.8s as the VFD builds.
+The style test's "2-Year Warranty" line is left out. Style test 1 itself is unchanged (`globeBG` + `globeBody`).
+
+```
+STYLE=4 node src/render.mjs build/rev2_video.mp4 30
+VIDEO=build/rev2_video.mp4 OUT=qualitrol-rev2-globe-open.mp4 ./src/mix_rev1.sh
+```
